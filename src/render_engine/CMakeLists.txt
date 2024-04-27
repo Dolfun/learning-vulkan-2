@@ -1,3 +1,10 @@
 add_library(render_engine render_engine.h render_engine.cc)
 target_compile_features(render_engine PUBLIC cxx_std_20)
+target_link_libraries(render_engine PUBLIC Vulkan::Vulkan PRIVATE fmt::fmt)
 target_include_directories(render_engine PUBLIC .)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  target_compile_options(render_engine PUBLIC -Wall -Wextra -Wpedantic -Werror)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  target_compile_options(render_engine PUBLIC /W4 /WX)
+endif()

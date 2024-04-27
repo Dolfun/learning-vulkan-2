@@ -5,10 +5,10 @@
 #include "render_engine.h"
 
 struct ApplicationInfo {
-  struct WindowInfo {
-    std::size_t width, height;
-    bool fullscreen;
+  struct WindowSize {
+    size_t width, height;
   } window;
+  bool fullscreen;
 };
 
 class Application {

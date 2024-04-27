@@ -7,9 +7,9 @@ int main() {
     ApplicationInfo info {
       .window = {
         .width = 1280,
-        .height = 720,
-        .fullscreen = false,
-      }
+        .height = 720
+      },
+      .fullscreen = false
     };
     
     Application app { info };

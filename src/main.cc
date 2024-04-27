@@ -15,8 +15,14 @@ int main() {
     Application app { info };
     app.run();
     
+  } catch (const vk::SystemError& e) {
+    fmt::println("vk::SystemError -> {}", e.what());
+    return -1;
   } catch (const std::exception& e) {
-    fmt::println("Exception Occured: {}", e.what());
+    fmt::println("std::exception-> {}", e.what());
+    return -1;
+  } catch (...) {
+    fmt::println("Unknown Error");
     return -1;
   }
 

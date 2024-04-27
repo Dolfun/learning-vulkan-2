@@ -14,6 +14,7 @@ public:
     } const resolution;
 
     std::vector<const char*> required_extensions;
+    std::vector<const char*> requested_layers;
   };
 
   RenderEngine(const Config&);
@@ -21,8 +22,11 @@ public:
   void render();
 
 private:
-  Config config;
+  void create_instance();
+  void check_required_extensions_support() const;
+  void check_validation_layers_support() const;
 
+  Config config;
   vk::raii::Context context;
   std::unique_ptr<vk::raii::Instance> instance;
 };

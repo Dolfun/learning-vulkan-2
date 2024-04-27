@@ -4,7 +4,11 @@
 #include <algorithm>
 
 Application::Application(const ApplicationInfo& _info) : info { _info } {
-  // Initialize GLFW
+  init_glfw();
+  init_render_engine();
+}
+
+void Application::init_glfw() {
   if (glfwInit() != GLFW_TRUE) {
     throw std::runtime_error("Failed to initialize GLFW");
   }
@@ -24,16 +28,17 @@ Application::Application(const ApplicationInfo& _info) : info { _info } {
   }
 
   glfwSetKeyCallback(window, key_callback);
+}
 
-  // RenderEngine::Config
+void Application::init_render_engine() {
   RenderEngine::Config render_config {
     .resolution = {
       .width = info.window.width,
       .height = info.window.height
-    }
+    },
+    .requested_layers = { "VK_LAYER_KHRONOS_validation" }
   };
 
-  // Find extensions required by GLFW
   uint32_t required_extension_count;
   const char** required_extensions = glfwGetRequiredInstanceExtensions(&required_extension_count);
   render_config.required_extensions.resize(required_extension_count);
@@ -43,7 +48,6 @@ Application::Application(const ApplicationInfo& _info) : info { _info } {
     render_config.required_extensions.begin()
   );
 
-  // Create render_engine
   render_engine = std::make_unique<RenderEngine>(render_config);
 }
 

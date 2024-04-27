@@ -26,6 +26,9 @@ public:
 private:
   static void key_callback(GLFWwindow*, int, int, int, int);
 
+  void init_glfw();
+  void init_render_engine();
+
   const ApplicationInfo& info;
   GLFWwindow* window;
   std::unique_ptr<RenderEngine> render_engine;

@@ -1,3 +1,4 @@
+add_subdirectory(render_engine)
 add_subdirectory(application)
 
 add_executable(main main.cc)

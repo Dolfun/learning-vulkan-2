@@ -1,6 +1,8 @@
 #pragma once
 #include <GLFW/glfw3.h>
 #include <cstddef>
+#include <memory>
+#include "render_engine.h"
 
 struct ApplicationInfo {
   struct WindowInfo {
@@ -26,4 +28,5 @@ private:
 
   const ApplicationInfo& info;
   GLFWwindow* window;
+  std::unique_ptr<RenderEngine> render_engine;
 };

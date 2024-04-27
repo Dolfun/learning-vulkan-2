@@ -22,6 +22,13 @@ Application::Application(const ApplicationInfo& _info) : info { _info } {
   }
 
   glfwSetKeyCallback(window, key_callback);
+
+  RenderInfo render_info {
+    .width = info.window.width,
+    .height = info.window.height
+  };
+
+  render_engine = std::make_unique<RenderEngine>(render_info);
 }
 
 void Application::key_callback(GLFWwindow* window, int key, int, int action, int) {

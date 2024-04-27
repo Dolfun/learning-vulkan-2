@@ -4,7 +4,15 @@
 int main() {
 
   try {
-    Application app;
+    ApplicationInfo info {
+      .window = {
+        .width = 1280,
+        .height = 720,
+        .fullscreen = false,
+      }
+    };
+    
+    Application app { info };
     app.run();
     
   } catch (const std::exception& e) {

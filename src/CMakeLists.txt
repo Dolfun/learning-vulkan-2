@@ -1,3 +1,4 @@
+add_subdirectory(application)
+
 add_executable(main main.cc)
-target_compile_features(main PRIVATE cxx_std_20)
-target_link_libraries(main PRIVATE fmt::fmt)
+target_link_libraries(main PRIVATE application fmt::fmt)

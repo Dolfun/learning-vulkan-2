@@ -2,8 +2,8 @@ set(render_engine_sources
   render_config.h
   render_engine.h
   render_engine.cc
-  create_instance.h
-  create_instance.cc
+  utility.h
+  utility.cc
 )
 
 add_library(render_engine ${render_engine_sources})

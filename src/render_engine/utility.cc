@@ -1,4 +1,4 @@
-#include "create_instance.h"
+#include "utility.h"
 #include <fmt/core.h>
 
 #ifdef NDEBUG
@@ -10,7 +10,7 @@
 void check_required_extensions_support(const std::vector<const char*>&, const vk::raii::Context&);
 void check_validation_layers_support(const std::vector<const char*>&, const vk::raii::Context&);
 
-auto create_instance(const RenderConfig& config, const vk::raii::Context& context)
+auto create_instance(RenderConfig config, const vk::raii::Context& context)
     -> std::unique_ptr<vk::raii::Instance> {
   vk::ApplicationInfo application_info {
     .sType = vk::StructureType::eApplicationInfo,
@@ -35,6 +35,9 @@ auto create_instance(const RenderConfig& config, const vk::raii::Context& contex
     instance_create_info.pNext = nullptr;
   }
 
+  if (enable_validation_layers) {
+    config.required_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+  }
   check_required_extensions_support(config.required_extensions, context);
   instance_create_info.enabledExtensionCount = static_cast<uint32_t>(config.required_extensions.size());
   instance_create_info.ppEnabledExtensionNames = config.required_extensions.data();

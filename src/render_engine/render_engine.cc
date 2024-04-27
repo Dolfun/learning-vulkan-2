@@ -45,7 +45,7 @@ void RenderEngine::create_instance() {
 }
 
 void RenderEngine::check_required_extensions_support() const {
-  auto available_extension = vk::enumerateInstanceExtensionProperties();
+  auto available_extension = context.enumerateInstanceExtensionProperties();
   for (const char* name : config.required_extensions) {
     bool found = std::ranges::any_of(available_extension, [name] (const vk::ExtensionProperties property) {
       return std::strcmp(name, property.extensionName.data());
@@ -57,7 +57,7 @@ void RenderEngine::check_required_extensions_support() const {
 }
 
 void RenderEngine::check_validation_layers_support() const {
-  auto available_layers = vk::enumerateInstanceLayerProperties();
+  auto available_layers = context.enumerateInstanceLayerProperties();
   for (const char* name : config.requested_layers) {
     bool found = std::ranges::any_of(available_layers, [name] (const vk::LayerProperties property) {
       return std::strcmp(name, property.layerName.data());

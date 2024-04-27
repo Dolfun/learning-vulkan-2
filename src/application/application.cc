@@ -31,7 +31,7 @@ void Application::init_glfw() {
 }
 
 void Application::init_render_engine() {
-  RenderEngine::Config render_config {
+  RenderConfig render_config {
     .resolution = {
       .width = info.window.width,
       .height = info.window.height

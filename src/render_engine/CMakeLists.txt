@@ -1,4 +1,12 @@
-add_library(render_engine render_engine.h render_engine.cc)
+set(render_engine_sources
+  render_config.h
+  render_engine.h
+  render_engine.cc
+  create_instance.h
+  create_instance.cc
+)
+
+add_library(render_engine ${render_engine_sources})
 target_compile_features(render_engine PUBLIC cxx_std_20)
 target_link_libraries(render_engine PUBLIC Vulkan::Vulkan PRIVATE fmt::fmt)
 target_include_directories(render_engine PUBLIC .)

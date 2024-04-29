@@ -1,8 +1,8 @@
 #include "render_engine.h"
-#include "utility.h"
 
-RenderEngine::RenderEngine(const RenderConfig& _config) : config { _config } {
-  instance = create_instance(config, context);
+RenderEngine::RenderEngine(const RenderConfig& _config)
+  : config { _config }, vulkan_context { config } {
+
 }
 
 void RenderEngine::render() {

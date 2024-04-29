@@ -36,16 +36,18 @@ void Application::init_render_engine() {
       .width = info.window.width,
       .height = info.window.height
     },
-    .requested_layers = { "VK_LAYER_KHRONOS_validation" }
+    .vulkan = {
+      .requested_layers = { "VK_LAYER_KHRONOS_validation" }
+    }
   };
 
   uint32_t required_extension_count;
   const char** required_extensions = glfwGetRequiredInstanceExtensions(&required_extension_count);
-  render_config.required_extensions.resize(required_extension_count);
+  render_config.vulkan.required_extensions.resize(required_extension_count);
   std::copy(
     required_extensions,
     required_extensions + required_extension_count,
-    render_config.required_extensions.begin()
+    render_config.vulkan.required_extensions.begin()
   );
 
   render_engine = std::make_unique<RenderEngine>(render_config);

@@ -11,10 +11,8 @@
 
 VulkanContext::VulkanContext(const RenderConfig& _config) : config { _config } {
   init_instance();
-  if constexpr (enable_validation_layers) {
-    init_debug_messenger();
-  }
   select_physical_device();
+  init_logical_device_and_queues();
 }
 
 void VulkanContext::init_instance() {
@@ -34,7 +32,7 @@ void VulkanContext::init_instance() {
 
   if constexpr (enable_validation_layers) {
     check_validation_layers_support();
-    init_debug_messenger_create_info();
+    auto debug_messenger_create_info = get_debug_messenger_create_info();
     create_info.enabledLayerCount = static_cast<uint32_t>(config.vulkan.requested_layers.size());
     create_info.ppEnabledLayerNames = config.vulkan.requested_layers.data();
     create_info.pNext = static_cast<const void*>(&debug_messenger_create_info);
@@ -79,22 +77,21 @@ void VulkanContext::check_validation_layers_support() {
 }
 
 void VulkanContext::init_debug_messenger() {
-  debug_messenger = std::make_unique<vk::raii::DebugUtilsMessengerEXT>(
-    *instance,
-    debug_messenger_create_info
-  );
+  auto create_info = get_debug_messenger_create_info();
+  debug_messenger = std::make_unique<vk::raii::DebugUtilsMessengerEXT>(*instance, create_info);
 }
 
-void VulkanContext::init_debug_messenger_create_info() {
+auto VulkanContext::get_debug_messenger_create_info() -> vk::DebugUtilsMessengerCreateInfoEXT {
   using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
   using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
-  debug_messenger_create_info = {
+  vk::DebugUtilsMessengerCreateInfoEXT create_info = {
     .sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT,
     .messageSeverity = eWarning | eError,
     .messageType = eGeneral | eValidation | ePerformance,
     .pfnUserCallback = debug_callback,
     .pUserData = nullptr
   };
+  return create_info;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanContext::debug_callback(
@@ -145,15 +142,16 @@ void VulkanContext::select_physical_device() {
   );
 }
 
-bool VulkanContext::is_device_suitable(const vk::raii::PhysicalDevice& device) {
-  auto indices = get_queue_family_indices(device);
+bool VulkanContext::is_device_suitable(const vk::raii::PhysicalDevice& phyiscal_device) {
+  auto indices = get_queue_family_indices(phyiscal_device);
   return indices.is_complete();
 }
 
-auto VulkanContext::get_queue_family_indices(const vk::raii::PhysicalDevice& device) -> QueueFamilyIndices {
+auto VulkanContext::get_queue_family_indices(const vk::raii::PhysicalDevice& phyiscal_device)
+   -> QueueFamilyIndices {
   QueueFamilyIndices indices;
 
-  auto properties = device.getQueueFamilyProperties();
+  auto properties = phyiscal_device.getQueueFamilyProperties();
   for (uint32_t i = 0; i < static_cast<uint32_t>(properties.size()); ++i) {
     if (properties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
       indices.graphics_family = i;
@@ -165,4 +163,39 @@ auto VulkanContext::get_queue_family_indices(const vk::raii::PhysicalDevice& dev
   }
 
   return indices;
+}
+
+void VulkanContext::init_logical_device_and_queues() {
+  auto indices = get_queue_family_indices(*physical_device);
+
+  float queue_priority = 1.0f;
+  vk::DeviceQueueCreateInfo queue_create_info {
+    .sType = vk::StructureType::eDeviceQueueCreateInfo,
+    .queueFamilyIndex = indices.graphics_family.value(),
+    .queueCount = 1,
+    .pQueuePriorities = &queue_priority,
+  };
+
+  vk::PhysicalDeviceFeatures device_features {};
+
+  vk::DeviceCreateInfo create_info {
+    .sType = vk::StructureType::eDeviceCreateInfo,
+    .queueCreateInfoCount = 1,
+    .pQueueCreateInfos = &queue_create_info,
+    .pEnabledFeatures = &device_features
+  };
+
+  if constexpr (enable_validation_layers) {
+    create_info.enabledLayerCount = static_cast<uint32_t>(config.vulkan.requested_layers.size());
+    create_info.ppEnabledLayerNames = config.vulkan.requested_layers.data();
+  } else {
+    create_info.enabledLayerCount = 0;
+    create_info.ppEnabledLayerNames = nullptr;
+  }
+
+  device = std::make_unique<vk::raii::Device>(*physical_device, create_info);
+  
+  graphics_queue = std::make_unique<vk::raii::Queue>(
+    device->getQueue(indices.graphics_family.value(), 0)
+  );
 }

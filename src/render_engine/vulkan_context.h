@@ -24,13 +24,13 @@ private:
 
   // Debug Messenger
   void init_debug_messenger();
-  void init_debug_messenger_create_info();
+  auto get_debug_messenger_create_info() 
+    -> vk::DebugUtilsMessengerCreateInfoEXT;
   static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT,
     VkDebugUtilsMessageTypeFlagsEXT,
     const VkDebugUtilsMessengerCallbackDataEXT*,
     void*);
-  vk::DebugUtilsMessengerCreateInfoEXT debug_messenger_create_info;
   std::unique_ptr<vk::raii::DebugUtilsMessengerEXT> debug_messenger;
 
   // Physical Device
@@ -46,5 +46,11 @@ private:
       return graphics_family.has_value();
     }
   };
-  auto get_queue_family_indices(const vk::raii::PhysicalDevice&) -> QueueFamilyIndices;
+  auto get_queue_family_indices(const vk::raii::PhysicalDevice&) 
+    -> QueueFamilyIndices;
+
+  // Logical Device and Queues
+  void init_logical_device_and_queues();
+  std::unique_ptr<vk::raii::Device> device;
+  std::unique_ptr<vk::raii::Queue> graphics_queue;
 };

@@ -1,11 +1,12 @@
 #include "vulkan_context.h"
+#include <algorithm>
 #include <fmt/core.h>
 #include <fmt/color.h>
 
 #ifdef NDEBUG
-  const bool enable_validation_layers = false;
+  constexpr bool enable_validation_layers = false;
 #else
-  const bool enable_validation_layers = true;
+  constexpr bool enable_validation_layers = true;
 #endif
 
 VulkanContext::VulkanContext(const RenderConfig& _config) : config { _config } {
@@ -13,6 +14,7 @@ VulkanContext::VulkanContext(const RenderConfig& _config) : config { _config } {
   if constexpr (enable_validation_layers) {
     init_debug_messenger();
   }
+  select_physical_device();
 }
 
 void VulkanContext::init_instance() {
@@ -128,4 +130,39 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanContext::debug_callback(
   fmt::print(fmt::fg(color), "{}", error);
 
   return VK_FALSE;
+}
+
+void VulkanContext::select_physical_device() {
+  vk::raii::PhysicalDevices physical_devices { *instance };
+  physical_device = std::make_unique<vk::raii::PhysicalDevice>(
+    *std::ranges::max_element(physical_devices, {}, [this] (const vk::raii::PhysicalDevice& device) {
+      if (!is_device_suitable(device) || device.getProperties().deviceType != vk::PhysicalDeviceType::eDiscreteGpu) {
+        return 0;
+      } else {
+        return 1;
+      }
+    })
+  );
+}
+
+bool VulkanContext::is_device_suitable(const vk::raii::PhysicalDevice& device) {
+  auto indices = get_queue_family_indices(device);
+  return indices.is_complete();
+}
+
+auto VulkanContext::get_queue_family_indices(const vk::raii::PhysicalDevice& device) -> QueueFamilyIndices {
+  QueueFamilyIndices indices;
+
+  auto properties = device.getQueueFamilyProperties();
+  for (uint32_t i = 0; i < static_cast<uint32_t>(properties.size()); ++i) {
+    if (properties[i].queueFlags & vk::QueueFlagBits::eGraphics) {
+      indices.graphics_family = i;
+    }
+
+    if (indices.is_complete()) {
+      break;
+    }
+  }
+
+  return indices;
 }

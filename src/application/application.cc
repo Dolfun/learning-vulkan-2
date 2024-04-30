@@ -50,7 +50,7 @@ void Application::init_render_engine() {
     render_config.vulkan.required_extensions.begin()
   );
 
-  render_engine = std::make_unique<RenderEngine>(render_config);
+  render_engine = std::make_unique<RenderEngine>(render_config, *this);
 }
 
 void Application::key_callback(GLFWwindow* window, int key, int, int action, int) {
@@ -62,6 +62,12 @@ void Application::key_callback(GLFWwindow* window, int key, int, int action, int
 void Application::run() {
   while(!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+  }
+}
+
+void Application::create_window_surface(const VkInstance& instance, VkSurfaceKHR& surface) const {
+  if (glfwCreateWindowSurface(instance, window, nullptr, &surface)) {
+    throw std::runtime_error("Failed to create window surface");
   }
 }
 

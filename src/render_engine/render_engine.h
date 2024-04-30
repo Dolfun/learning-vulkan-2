@@ -1,13 +1,15 @@
 #pragma once
 #include "vulkan_context.h"
 
+class Application;
+
 class RenderEngine {
 public:
-  RenderEngine(const RenderConfig&);
+  RenderEngine(const RenderConfig&, const Application&);
 
   void render();
 
 private:
-  RenderConfig config;
+  const RenderConfig& config;
   VulkanContext vulkan_context;
 };

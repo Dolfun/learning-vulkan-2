@@ -7,9 +7,11 @@
 #include <vulkan/vulkan_raii.hpp>
 #include "render_config.h"
 
+class Application;
+
 class VulkanContext {
 public:
-  VulkanContext(const RenderConfig&);
+  VulkanContext(const RenderConfig&, const Application&);
 
 private:
   const RenderConfig& config;
@@ -33,6 +35,10 @@ private:
     void*);
   std::unique_ptr<vk::raii::DebugUtilsMessengerEXT> debug_messenger;
 
+  // Window Surface
+  void init_window_surface(const Application&);
+  std::unique_ptr<vk::raii::SurfaceKHR> surface;
+
   // Physical Device
   void select_physical_device();
   bool is_device_suitable(const vk::raii::PhysicalDevice&);
@@ -41,16 +47,21 @@ private:
   // Queue Family
   struct QueueFamilyIndices {
     std::optional<uint32_t> graphics_family;
+    std::optional<uint32_t> present_family;
 
     bool is_complete() {
-      return graphics_family.has_value();
+      return graphics_family.has_value() && present_family.has_value();
     }
-  };
+  } queue_family_indices;
   auto get_queue_family_indices(const vk::raii::PhysicalDevice&) 
     -> QueueFamilyIndices;
 
-  // Logical Device and Queues
-  void init_logical_device_and_queues();
+  // Logical Device
+  void init_logical_device();
   std::unique_ptr<vk::raii::Device> device;
+
+  // Queues
+  void init_queues();
   std::unique_ptr<vk::raii::Queue> graphics_queue;
+  std::unique_ptr<vk::raii::Queue> present_queue;
 };

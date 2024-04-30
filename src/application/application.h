@@ -1,4 +1,5 @@
 #pragma once
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <cstddef>
 #include <memory>
@@ -22,6 +23,8 @@ public:
   Application& operator=(Application&&) = delete;
 
   void run();
+
+  void create_window_surface(const VkInstance&, VkSurfaceKHR&) const;
 
 private:
   static void key_callback(GLFWwindow*, int, int, int, int);

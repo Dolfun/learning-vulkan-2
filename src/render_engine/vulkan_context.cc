@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <fmt/core.h>
 #include <fmt/color.h>
+#include <set>
+#include "../application/application.h"
 
 #ifdef NDEBUG
   constexpr bool enable_validation_layers = false;
@@ -9,10 +11,14 @@
   constexpr bool enable_validation_layers = true;
 #endif
 
-VulkanContext::VulkanContext(const RenderConfig& _config) : config { _config } {
+VulkanContext::VulkanContext(const RenderConfig& _config, const Application& application)
+    : config { _config } {
   init_instance();
+  init_debug_messenger();
+  init_window_surface(application);
   select_physical_device();
-  init_logical_device_and_queues();
+  init_logical_device();
+  init_queues();
 }
 
 void VulkanContext::init_instance() {
@@ -129,6 +135,12 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanContext::debug_callback(
   return VK_FALSE;
 }
 
+void VulkanContext::init_window_surface(const Application& application) {
+  VkSurfaceKHR _surface;
+  application.create_window_surface(**instance, _surface);
+  surface = std::make_unique<vk::raii::SurfaceKHR>(*instance, _surface);
+}
+
 void VulkanContext::select_physical_device() {
   vk::raii::PhysicalDevices physical_devices { *instance };
   physical_device = std::make_unique<vk::raii::PhysicalDevice>(
@@ -157,6 +169,10 @@ auto VulkanContext::get_queue_family_indices(const vk::raii::PhysicalDevice& phy
       indices.graphics_family = i;
     }
 
+    if (phyiscal_device.getSurfaceSupportKHR(i, *surface)) {
+      indices.present_family = i;
+    }
+
     if (indices.is_complete()) {
       break;
     }
@@ -165,23 +181,34 @@ auto VulkanContext::get_queue_family_indices(const vk::raii::PhysicalDevice& phy
   return indices;
 }
 
-void VulkanContext::init_logical_device_and_queues() {
-  auto indices = get_queue_family_indices(*physical_device);
+void VulkanContext::init_logical_device() {
+  queue_family_indices = get_queue_family_indices(*physical_device);
 
-  float queue_priority = 1.0f;
-  vk::DeviceQueueCreateInfo queue_create_info {
-    .sType = vk::StructureType::eDeviceQueueCreateInfo,
-    .queueFamilyIndex = indices.graphics_family.value(),
-    .queueCount = 1,
-    .pQueuePriorities = &queue_priority,
+  std::set<uint32_t> unique_queue_families {
+    queue_family_indices.graphics_family.value(),
+    queue_family_indices.present_family.value()
   };
+
+  std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
+  queue_create_infos.reserve(unique_queue_families.size());
+
+  for (auto queue_family : unique_queue_families) {
+    float queue_priority = 1.0f;
+    vk::DeviceQueueCreateInfo queue_create_info {
+      .sType = vk::StructureType::eDeviceQueueCreateInfo,
+      .queueFamilyIndex = queue_family,
+      .queueCount = 1,
+      .pQueuePriorities = &queue_priority,
+    };
+    queue_create_infos.emplace_back(queue_create_info);
+  }
 
   vk::PhysicalDeviceFeatures device_features {};
 
   vk::DeviceCreateInfo create_info {
     .sType = vk::StructureType::eDeviceCreateInfo,
-    .queueCreateInfoCount = 1,
-    .pQueueCreateInfos = &queue_create_info,
+    .queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size()),
+    .pQueueCreateInfos = queue_create_infos.data(),
     .pEnabledFeatures = &device_features
   };
 
@@ -194,8 +221,14 @@ void VulkanContext::init_logical_device_and_queues() {
   }
 
   device = std::make_unique<vk::raii::Device>(*physical_device, create_info);
-  
+}
+
+void VulkanContext::init_queues() {
   graphics_queue = std::make_unique<vk::raii::Queue>(
-    device->getQueue(indices.graphics_family.value(), 0)
+    device->getQueue(queue_family_indices.graphics_family.value(), 0)
+  );
+
+  present_queue = std::make_unique<vk::raii::Queue>(
+    device->getQueue(queue_family_indices.present_family.value(), 0)
   );
 }

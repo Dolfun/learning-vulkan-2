@@ -2,10 +2,11 @@
 #include <fmt/core.h>
 #include <stdexcept>
 #include <algorithm>
+#include "../timeit.h"
 
 Application::Application(const ApplicationInfo& _info) : info { _info } {
-  init_glfw();
-  init_render_engine();
+  timeit("init_glfw", [this] { init_glfw(); });
+  timeit("init_render_engine", [this] { init_render_engine(); });
 }
 
 void Application::init_glfw() {

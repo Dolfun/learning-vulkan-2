@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <cstddef>
 #include <memory>
+#include <utility>
 #include "render_engine.h"
 
 struct ApplicationInfo {
@@ -25,6 +26,7 @@ public:
   void run();
 
   void create_window_surface(const VkInstance&, VkSurfaceKHR&) const;
+  std::pair<int, int> get_framebuffer_size() const;
 
 private:
   static void key_callback(GLFWwindow*, int, int, int, int);

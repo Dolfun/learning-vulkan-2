@@ -1,5 +1,4 @@
 #pragma once
-
 #include <memory>
 #include <optional>
 #define VULKAN_HPP_NO_CONSTRUCTORS
@@ -39,8 +38,9 @@ private:
   std::unique_ptr<vk::raii::SurfaceKHR> surface;
 
   // Physical Device
-  void select_physical_device();
+  void init_physical_device();
   bool is_device_suitable(const vk::raii::PhysicalDevice&);
+  std::vector<const char*> required_device_extensions;
   std::unique_ptr<vk::raii::PhysicalDevice> physical_device;
 
   // Queue Family
@@ -63,4 +63,21 @@ private:
   void init_queues();
   std::unique_ptr<vk::raii::Queue> graphics_queue;
   std::unique_ptr<vk::raii::Queue> present_queue;
+
+  // Swap Chain
+  struct SwapChainInfo {
+    vk::SurfaceCapabilitiesKHR capabilities;
+    std::vector<vk::SurfaceFormatKHR> formats;
+    std::vector<vk::PresentModeKHR> present_modes;
+  } swap_chain_info;
+  auto get_swap_chain_info(const vk::raii::PhysicalDevice&)
+    -> SwapChainInfo;
+  auto select_swap_chain_extent(const vk::SurfaceCapabilitiesKHR&, const Application&)
+    -> vk::Extent2D;
+  auto select_surface_format(const std::vector<vk::SurfaceFormatKHR>&)
+    -> vk::SurfaceFormatKHR;
+  auto select_present_mode(const std::vector<vk::PresentModeKHR>&)
+    -> vk::PresentModeKHR;
+  void init_swap_chain(const Application&);
+  std::unique_ptr<vk::raii::SwapchainKHR> swap_chain;
 };

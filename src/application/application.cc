@@ -71,6 +71,12 @@ void Application::create_window_surface(const VkInstance& instance, VkSurfaceKHR
   }
 }
 
+std::pair<int, int> Application::get_framebuffer_size() const {
+  std::pair<int, int> framebuffer_size;
+  glfwGetFramebufferSize(window, &framebuffer_size.first, &framebuffer_size.second);
+  return framebuffer_size;
+}
+
 Application::~Application() {
   glfwDestroyWindow(window);
   glfwTerminate();

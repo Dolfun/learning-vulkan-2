@@ -21,6 +21,7 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   init_logical_device();
   init_queues();
   init_swap_chain(application);
+  init_swap_chain_image_views();
 }
 
 void RenderEngine::init_instance() {
@@ -362,4 +363,35 @@ void RenderEngine::init_swap_chain(const Application& application) {
   }
 
   swap_chain = std::make_unique<vk::raii::SwapchainKHR>(*device, create_info);
+  swap_chain_images = swap_chain->getImages();
+  swap_chain_extent = extent;
+  swap_chain_image_format = surface_format.format;
+}
+
+void RenderEngine::init_swap_chain_image_views() {
+  auto size = swap_chain_images.size();
+  swap_chain_image_views.reserve(size);
+  for (size_t i = 0; i < size; ++i) {
+    vk::ImageViewCreateInfo create_info {
+      .sType = vk::StructureType::eImageViewCreateInfo,
+      .image = swap_chain_images[i],
+      .viewType = vk::ImageViewType::e2D,
+      .format = swap_chain_image_format,
+      .components = {
+        .r = vk::ComponentSwizzle::eIdentity,
+        .g = vk::ComponentSwizzle::eIdentity,
+        .b = vk::ComponentSwizzle::eIdentity,
+        .a = vk::ComponentSwizzle::eIdentity,
+      },
+      .subresourceRange = {
+        .aspectMask = vk::ImageAspectFlagBits::eColor,
+        .baseMipLevel = 0,
+        .levelCount = 1,
+        .baseArrayLayer = 0,
+        .layerCount = 1
+      }
+    };
+
+    swap_chain_image_views.emplace_back(*device, create_info);
+  }
 }

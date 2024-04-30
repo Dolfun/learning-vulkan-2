@@ -80,4 +80,11 @@ private:
     -> vk::PresentModeKHR;
   void init_swap_chain(const Application&);
   std::unique_ptr<vk::raii::SwapchainKHR> swap_chain;
+  std::vector<vk::Image> swap_chain_images;
+  vk::Format swap_chain_image_format;
+  vk::Extent2D swap_chain_extent;
+
+  // Image Views
+  std::vector<vk::raii::ImageView> swap_chain_image_views;
+  void init_swap_chain_image_views();
 };

@@ -4,6 +4,7 @@
 #include <fmt/color.h>
 #include <fstream>
 #include <limits>
+#include <array>
 #include <set>
 #include "../application/application.h"
 
@@ -23,6 +24,7 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   init_queues();
   init_swap_chain(application);
   init_swap_chain_image_views();
+  create_render_pass();
   create_graphics_pipeline();
 }
 
@@ -398,10 +400,44 @@ void RenderEngine::init_swap_chain_image_views() {
   }
 }
 
+void RenderEngine::create_render_pass() {
+  vk::AttachmentDescription color_attachment {
+    .format = swap_chain_image_format,
+    .samples = vk::SampleCountFlagBits::e1,
+    .loadOp = vk::AttachmentLoadOp::eClear,
+    .storeOp = vk::AttachmentStoreOp::eStore,
+    .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+    .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+    .initialLayout = vk::ImageLayout::eUndefined,
+    .finalLayout = vk::ImageLayout::ePresentSrcKHR
+  };
+
+  vk::AttachmentReference color_attachment_reference {
+    .attachment = 0,
+    .layout = vk::ImageLayout::eColorAttachmentOptimal
+  };
+
+  vk::SubpassDescription subpass_description {
+    .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+    .colorAttachmentCount = 1,
+    .pColorAttachments = &color_attachment_reference,
+  };
+
+  vk::RenderPassCreateInfo create_info {
+    .sType = vk::StructureType::eRenderPassCreateInfo,
+    .attachmentCount = 1,
+    .pAttachments = &color_attachment,
+    .subpassCount = 1,
+    .pSubpasses = &subpass_description
+  };
+
+  render_pass = std::make_unique<vk::raii::RenderPass>(*device, create_info);
+}
+
 void RenderEngine::create_graphics_pipeline() {
+  // Shader Stage
   auto vertex_shader_code = read_file("shaders/main.vert.spv");
   auto fragment_shader_code = read_file("shaders/main.frag.spv");
-
   auto vertex_shader_module = create_shader_module(vertex_shader_code);
   auto fragment_shader_module = create_shader_module(fragment_shader_code);
 
@@ -419,9 +455,96 @@ void RenderEngine::create_graphics_pipeline() {
     .pName = "main"
   };
 
-  vk::PipelineShaderStageCreateInfo shader_stages[] = {
+  std::array shader_stages = {
     vertex_shader_stage_create_info, fragment_shader_stage_create_info
   };
+
+  // Vertex Input
+  vk::PipelineVertexInputStateCreateInfo vertex_input_state_create_info {
+    .sType = vk::StructureType::ePipelineVertexInputStateCreateInfo,
+    .vertexBindingDescriptionCount = 0,
+    .pVertexBindingDescriptions = nullptr,
+    .vertexAttributeDescriptionCount = 0,
+    .pVertexAttributeDescriptions = nullptr
+  };
+
+  // Input Assembly
+  vk::PipelineInputAssemblyStateCreateInfo input_assembly_state_create_info {
+    .sType = vk::StructureType::ePipelineInputAssemblyStateCreateInfo,
+    .topology = vk::PrimitiveTopology::eTriangleList,
+    .primitiveRestartEnable = false
+  };
+
+  // Dynamic State
+  std::array dynamic_states {
+    vk::DynamicState::eViewport,
+    vk::DynamicState::eScissor
+  };
+
+  vk::PipelineDynamicStateCreateInfo dynamic_state_create_info {
+    .sType = vk::StructureType::ePipelineDynamicStateCreateInfo,
+    .dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
+    .pDynamicStates = dynamic_states.data()
+  };
+
+  vk::PipelineViewportStateCreateInfo viewport_state_create_info {
+    .sType = vk::StructureType::ePipelineViewportStateCreateInfo,
+    .viewportCount = 1,
+    .scissorCount = 1
+  };
+
+  vk::PipelineRasterizationStateCreateInfo rasterization_state_create_info {
+    .sType = vk::StructureType::ePipelineRasterizationStateCreateInfo,
+    .depthClampEnable = false,
+    .rasterizerDiscardEnable = false,
+    .polygonMode = vk::PolygonMode::eFill,
+    .cullMode = vk::CullModeFlagBits::eBack,
+    .frontFace = vk::FrontFace::eClockwise,
+    .depthBiasEnable = false,
+    .lineWidth = 1.0f
+  };
+
+  vk::PipelineMultisampleStateCreateInfo multisample_state_create_info {
+    .sType = vk::StructureType::ePipelineMultisampleStateCreateInfo,
+    .rasterizationSamples = vk::SampleCountFlagBits::e1,
+    .sampleShadingEnable = false,
+  };
+
+  using enum vk::ColorComponentFlagBits;
+  vk::PipelineColorBlendAttachmentState color_blend_attachment_state {
+    .blendEnable = false,
+    .colorWriteMask = eR | eG | eB | eA
+  };
+
+  vk::PipelineColorBlendStateCreateInfo color_blend_state_create_info {
+    .sType = vk::StructureType::ePipelineColorBlendStateCreateInfo,
+    .attachmentCount = 1,
+    .pAttachments = &color_blend_attachment_state
+  };
+
+  vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
+    .sType = vk::StructureType::ePipelineLayoutCreateInfo
+  };
+  pipeline_layout = std::make_unique<vk::raii::PipelineLayout>(*device, pipeline_layout_create_info);
+
+  vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info {
+    .sType = vk::StructureType::eGraphicsPipelineCreateInfo,
+    .stageCount = static_cast<uint32_t>(shader_stages.size()),
+    .pStages = shader_stages.data(),
+    .pVertexInputState = &vertex_input_state_create_info,
+    .pInputAssemblyState = &input_assembly_state_create_info,
+    .pViewportState = &viewport_state_create_info,
+    .pRasterizationState = &rasterization_state_create_info,
+    .pMultisampleState = &multisample_state_create_info,
+    .pDepthStencilState = nullptr,
+    .pColorBlendState = &color_blend_state_create_info,
+    .pDynamicState = &dynamic_state_create_info,
+    .layout = *pipeline_layout,
+    .renderPass = *render_pass,
+    .subpass = 0,
+  };
+
+  graphics_pipeline = std::make_unique<vk::raii::Pipeline>(*device, nullptr, graphics_pipeline_create_info);
 }
 
 std::vector<std::byte> RenderEngine::read_file(const std::string& path) {

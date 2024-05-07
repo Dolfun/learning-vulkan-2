@@ -26,6 +26,7 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   init_swap_chain_image_views();
   create_render_pass();
   create_graphics_pipeline();
+  create_framebuffers();
 }
 
 void RenderEngine::init_instance() {
@@ -570,4 +571,25 @@ auto RenderEngine::create_shader_module(const std::vector<std::byte>& code)
   };
 
   return std::make_unique<vk::raii::ShaderModule>(*device, create_info);
+}
+
+void RenderEngine::create_framebuffers() {
+  swap_chain_framebuffers.reserve(swap_chain_image_views.size());
+  for (size_t i = 0; i < swap_chain_image_views.size(); ++i) {
+    std::array attachments = {
+      *swap_chain_image_views[i]
+    };
+    
+    vk::FramebufferCreateInfo create_info {
+      .sType = vk::StructureType::eFramebufferCreateInfo,
+      .renderPass = *render_pass,
+      .attachmentCount = static_cast<uint32_t>(attachments.size()),
+      .pAttachments = attachments.data(),
+      .width = swap_chain_extent.width,
+      .height = swap_chain_extent.height,
+      .layers = 1
+    };
+
+    swap_chain_framebuffers.emplace_back(*device, create_info);
+  }
 }

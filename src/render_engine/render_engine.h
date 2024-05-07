@@ -98,4 +98,8 @@ private:
   auto create_shader_module(const std::vector<std::byte>&) -> std::unique_ptr<vk::raii::ShaderModule>;
   std::unique_ptr<vk::raii::PipelineLayout> pipeline_layout;
   std::unique_ptr<vk::raii::Pipeline> graphics_pipeline;
+
+  // Framebuffers
+  void create_framebuffers();
+  std::vector<vk::raii::Framebuffer> swap_chain_framebuffers;
 };

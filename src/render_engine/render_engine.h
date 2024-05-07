@@ -87,4 +87,9 @@ private:
   // Image Views
   std::vector<vk::raii::ImageView> swap_chain_image_views;
   void init_swap_chain_image_views();
+
+  // Graphics Pipeline
+  void create_graphics_pipeline();
+  std::vector<std::byte> read_file(const std::string&);
+  auto create_shader_module(const std::vector<std::byte>&) -> std::unique_ptr<vk::raii::ShaderModule>;
 };

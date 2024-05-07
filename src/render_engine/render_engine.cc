@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <fmt/core.h>
 #include <fmt/color.h>
+#include <fstream>
 #include <limits>
 #include <set>
 #include "../application/application.h"
@@ -22,6 +23,7 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   init_queues();
   init_swap_chain(application);
   init_swap_chain_image_views();
+  create_graphics_pipeline();
 }
 
 void RenderEngine::init_instance() {
@@ -394,4 +396,55 @@ void RenderEngine::init_swap_chain_image_views() {
 
     swap_chain_image_views.emplace_back(*device, create_info);
   }
+}
+
+void RenderEngine::create_graphics_pipeline() {
+  auto vertex_shader_code = read_file("shaders/main.vert.spv");
+  auto fragment_shader_code = read_file("shaders/main.frag.spv");
+
+  auto vertex_shader_module = create_shader_module(vertex_shader_code);
+  auto fragment_shader_module = create_shader_module(fragment_shader_code);
+
+  vk::PipelineShaderStageCreateInfo vertex_shader_stage_create_info {
+    .sType = vk::StructureType::ePipelineShaderStageCreateInfo,
+    .stage = vk::ShaderStageFlagBits::eVertex,
+    .module = *vertex_shader_module,
+    .pName = "main"
+  };
+
+  vk::PipelineShaderStageCreateInfo fragment_shader_stage_create_info {
+    .sType = vk::StructureType::ePipelineShaderStageCreateInfo,
+    .stage = vk::ShaderStageFlagBits::eFragment,
+    .module = *fragment_shader_module,
+    .pName = "main"
+  };
+
+  vk::PipelineShaderStageCreateInfo shader_stages[] = {
+    vertex_shader_stage_create_info, fragment_shader_stage_create_info
+  };
+}
+
+std::vector<std::byte> RenderEngine::read_file(const std::string& path) {
+  std::ifstream file { path, std::ios::ate | std::ios::binary };
+  if (!file.is_open()) {
+    throw std::runtime_error("Failed to open file: " + path);
+  }
+
+  auto size = static_cast<size_t>(file.tellg());
+  std::vector<std::byte> buffer(size);
+  file.seekg(0);
+  file.read(reinterpret_cast<char*>(buffer.data()), size);
+  
+  return buffer;
+}
+
+auto RenderEngine::create_shader_module(const std::vector<std::byte>& code) 
+  -> std::unique_ptr<vk::raii::ShaderModule> {
+  vk::ShaderModuleCreateInfo create_info {
+    .sType = vk::StructureType::eShaderModuleCreateInfo,
+    .codeSize = code.size(),
+    .pCode = reinterpret_cast<const uint32_t*>(code.data())
+  };
+
+  return std::make_unique<vk::raii::ShaderModule>(*device, create_info);
 }

@@ -12,6 +12,9 @@ class RenderEngine {
 public:
   RenderEngine(const RenderConfig&, const Application&);
 
+  void render();
+  void cleanup();
+
 private:
   const RenderConfig& config;
   vk::raii::Context context;
@@ -111,4 +114,9 @@ private:
   void create_command_buffer();
   void record_command_buffer(vk::raii::CommandBuffer&, uint32_t);
   std::unique_ptr<vk::raii::CommandBuffer> command_buffer;
+
+  // Rendering
+  std::unique_ptr<vk::raii::Semaphore> image_available_semaphore, render_finished_semaphore;
+  std::unique_ptr<vk::raii::Fence> in_flight_fence;
+  void create_sync_objects();
 };

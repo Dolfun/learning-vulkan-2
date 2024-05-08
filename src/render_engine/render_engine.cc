@@ -29,6 +29,7 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   create_framebuffers();
   create_command_pool();
   create_command_buffer();
+  create_sync_objects();
 }
 
 void RenderEngine::init_instance() {
@@ -426,12 +427,23 @@ void RenderEngine::create_render_pass() {
     .pColorAttachments = &color_attachment_reference,
   };
 
+  vk::SubpassDependency subpass_dependency {
+    .srcSubpass = vk::SubpassExternal,
+    .dstSubpass = 0,
+    .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+    .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+    .srcAccessMask = vk::AccessFlagBits::eNone,
+    .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite
+  };
+
   vk::RenderPassCreateInfo create_info {
     .sType = vk::StructureType::eRenderPassCreateInfo,
     .attachmentCount = 1,
     .pAttachments = &color_attachment,
     .subpassCount = 1,
-    .pSubpasses = &subpass_description
+    .pSubpasses = &subpass_description,
+    .dependencyCount = 1,
+    .pDependencies = &subpass_dependency
   };
 
   render_pass = std::make_unique<vk::raii::RenderPass>(*device, create_info);
@@ -660,4 +672,59 @@ void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& _command_buffe
 
   _command_buffer.endRenderPass();
   _command_buffer.end();
+}
+
+void RenderEngine::create_sync_objects() {
+  vk::SemaphoreCreateInfo semaphore_create_info {
+    .sType = vk::StructureType::eSemaphoreCreateInfo
+  };
+  image_available_semaphore = std::make_unique<vk::raii::Semaphore>(*device, semaphore_create_info);
+  render_finished_semaphore = std::make_unique<vk::raii::Semaphore>(*device, semaphore_create_info);
+
+  vk::FenceCreateInfo fence_create_info {
+    .sType = vk::StructureType::eFenceCreateInfo,
+    .flags = vk::FenceCreateFlagBits::eSignaled
+  };
+  in_flight_fence = std::make_unique<vk::raii::Fence>(*device, fence_create_info);
+}
+
+void RenderEngine::render() {
+  (void)device->waitForFences(**in_flight_fence, true, UINT64_MAX);
+  device->resetFences(**in_flight_fence);
+
+  auto [result, image_index] = swap_chain->acquireNextImage(UINT32_MAX, *image_available_semaphore);
+  command_buffer->reset();
+  record_command_buffer(*command_buffer, image_index);
+
+  vk::Semaphore wait_semaphores[] = { **image_available_semaphore };
+  vk::PipelineStageFlags wait_stages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
+  vk::Semaphore signal_semaphores[] = { **render_finished_semaphore };
+  vk::CommandBuffer command_buffers[] = { **command_buffer };
+  vk::SubmitInfo submit_info {
+    .sType = vk::StructureType::eSubmitInfo,
+    .waitSemaphoreCount = 1,
+    .pWaitSemaphores = wait_semaphores,
+    .pWaitDstStageMask = wait_stages,
+    .commandBufferCount = 1,
+    .pCommandBuffers = command_buffers,
+    .signalSemaphoreCount = 1,
+    .pSignalSemaphores = signal_semaphores
+  };
+  graphics_queue->submit(submit_info, *in_flight_fence);
+
+  vk::SwapchainKHR swap_chains[] = { **swap_chain };
+  vk::PresentInfoKHR present_info {
+    .sType = vk::StructureType::ePresentInfoKHR,
+    .waitSemaphoreCount = 1,
+    .pWaitSemaphores = signal_semaphores,
+    .swapchainCount = 1,
+    .pSwapchains = swap_chains,
+    .pImageIndices = &image_index
+  };
+
+  (void)present_queue->presentKHR(present_info);
+}
+
+void RenderEngine::cleanup() {
+  device->waitIdle();
 }

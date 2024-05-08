@@ -63,6 +63,8 @@ void Application::key_callback(GLFWwindow* window, int key, int, int action, int
 void Application::run() {
   while(!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+
+    render_engine->render();
   }
 }
 
@@ -79,6 +81,8 @@ std::pair<int, int> Application::get_framebuffer_size() const {
 }
 
 Application::~Application() {
+  render_engine->cleanup();
+
   glfwDestroyWindow(window);
   glfwTerminate();
 }

@@ -102,4 +102,13 @@ private:
   // Framebuffers
   void create_framebuffers();
   std::vector<vk::raii::Framebuffer> swap_chain_framebuffers;
+
+  // Command Pool
+  void create_command_pool();
+  std::unique_ptr<vk::raii::CommandPool> command_pool;
+
+  // Command Buffer
+  void create_command_buffer();
+  void record_command_buffer(vk::raii::CommandBuffer&, uint32_t);
+  std::unique_ptr<vk::raii::CommandBuffer> command_buffer;
 };

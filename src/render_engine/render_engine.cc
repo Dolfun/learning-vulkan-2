@@ -27,6 +27,8 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   create_render_pass();
   create_graphics_pipeline();
   create_framebuffers();
+  create_command_pool();
+  create_command_buffer();
 }
 
 void RenderEngine::init_instance() {
@@ -592,4 +594,70 @@ void RenderEngine::create_framebuffers() {
 
     swap_chain_framebuffers.emplace_back(*device, create_info);
   }
+}
+
+void RenderEngine::create_command_pool() {
+  vk::CommandPoolCreateInfo create_info {
+    .sType = vk::StructureType::eCommandPoolCreateInfo,
+    .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+    .queueFamilyIndex = queue_family_indices.graphics_family.value()
+  };
+
+  command_pool = std::make_unique<vk::raii::CommandPool>(*device, create_info);
+}
+
+void RenderEngine::create_command_buffer() {
+  vk::CommandBufferAllocateInfo allocate_info {
+    .sType = vk::StructureType::eCommandBufferAllocateInfo,
+    .commandPool = *command_pool,
+    .level = vk::CommandBufferLevel::ePrimary,
+    .commandBufferCount = 1
+  };
+
+  vk::raii::CommandBuffers command_buffers { *device, allocate_info };
+  command_buffer = std::make_unique<vk::raii::CommandBuffer>(std::move(command_buffers[0]));
+}
+
+void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& _command_buffer, uint32_t image_index) {
+  vk::CommandBufferBeginInfo command_buffer_begin_info {
+    .sType = vk::StructureType::eCommandBufferBeginInfo,
+  };
+  _command_buffer.begin(command_buffer_begin_info);
+
+  vk::ClearValue clear_color {{ std::array { 0.0f, 0.0f, 0.0f, 1.0f }}};
+  vk::RenderPassBeginInfo render_pass_begin_info {
+    .sType = vk::StructureType::eRenderPassBeginInfo,
+    .renderPass = *render_pass,
+    .framebuffer = swap_chain_framebuffers[image_index],
+    .renderArea = {
+      .offset = { 0, 0 },
+      .extent = swap_chain_extent
+    },
+    .clearValueCount = 1,
+    .pClearValues = &clear_color
+  };
+  _command_buffer.beginRenderPass(render_pass_begin_info, vk::SubpassContents::eInline);
+
+  _command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphics_pipeline);
+
+  vk::Viewport viewport {
+    .x = 0.0f,
+    .y = 0.0f,
+    .width = static_cast<float>(swap_chain_extent.width),
+    .height = static_cast<float>(swap_chain_extent.height),
+    .minDepth = 0.0f,
+    .maxDepth = 1.0f
+  };
+  _command_buffer.setViewport(0, viewport);
+
+  vk::Rect2D scissor {
+    .offset = { 0, 0 },
+    .extent = swap_chain_extent
+  };
+  _command_buffer.setScissor(0, scissor);
+
+  _command_buffer.draw(3, 1, 0, 0);
+
+  _command_buffer.endRenderPass();
+  _command_buffer.end();
 }

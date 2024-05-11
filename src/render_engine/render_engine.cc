@@ -15,7 +15,7 @@
 #endif
 
 RenderEngine::RenderEngine(const RenderConfig& _config, const Application& application)
-    : config { _config } {
+    : config { _config }, current_frame { 0 } {
   init_instance();
   init_debug_messenger();
   init_window_surface(application);
@@ -623,18 +623,20 @@ void RenderEngine::create_command_buffer() {
     .sType = vk::StructureType::eCommandBufferAllocateInfo,
     .commandPool = *command_pool,
     .level = vk::CommandBufferLevel::ePrimary,
-    .commandBufferCount = 1
+    .commandBufferCount = config.max_frames_in_flight
   };
 
-  vk::raii::CommandBuffers command_buffers { *device, allocate_info };
-  command_buffer = std::make_unique<vk::raii::CommandBuffer>(std::move(command_buffers[0]));
+  vk::raii::CommandBuffers _command_buffers { *device, allocate_info };
+  for (auto& command_buffer : _command_buffers) {
+    command_buffers.emplace_back(std::move(command_buffer));
+  }
 }
 
-void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& _command_buffer, uint32_t image_index) {
+void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& command_buffer, uint32_t image_index) {
   vk::CommandBufferBeginInfo command_buffer_begin_info {
     .sType = vk::StructureType::eCommandBufferBeginInfo,
   };
-  _command_buffer.begin(command_buffer_begin_info);
+  command_buffer.begin(command_buffer_begin_info);
 
   vk::ClearValue clear_color {{ std::array { 0.0f, 0.0f, 0.0f, 1.0f }}};
   vk::RenderPassBeginInfo render_pass_begin_info {
@@ -648,9 +650,9 @@ void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& _command_buffe
     .clearValueCount = 1,
     .pClearValues = &clear_color
   };
-  _command_buffer.beginRenderPass(render_pass_begin_info, vk::SubpassContents::eInline);
+  command_buffer.beginRenderPass(render_pass_begin_info, vk::SubpassContents::eInline);
 
-  _command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphics_pipeline);
+  command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphics_pipeline);
 
   vk::Viewport viewport {
     .x = 0.0f,
@@ -660,57 +662,65 @@ void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& _command_buffe
     .minDepth = 0.0f,
     .maxDepth = 1.0f
   };
-  _command_buffer.setViewport(0, viewport);
+  command_buffer.setViewport(0, viewport);
 
   vk::Rect2D scissor {
     .offset = { 0, 0 },
     .extent = swap_chain_extent
   };
-  _command_buffer.setScissor(0, scissor);
+  command_buffer.setScissor(0, scissor);
 
-  _command_buffer.draw(3, 1, 0, 0);
+  command_buffer.draw(3, 1, 0, 0);
 
-  _command_buffer.endRenderPass();
-  _command_buffer.end();
+  command_buffer.endRenderPass();
+  command_buffer.end();
 }
 
 void RenderEngine::create_sync_objects() {
   vk::SemaphoreCreateInfo semaphore_create_info {
     .sType = vk::StructureType::eSemaphoreCreateInfo
   };
-  image_available_semaphore = std::make_unique<vk::raii::Semaphore>(*device, semaphore_create_info);
-  render_finished_semaphore = std::make_unique<vk::raii::Semaphore>(*device, semaphore_create_info);
 
   vk::FenceCreateInfo fence_create_info {
     .sType = vk::StructureType::eFenceCreateInfo,
     .flags = vk::FenceCreateFlagBits::eSignaled
   };
-  in_flight_fence = std::make_unique<vk::raii::Fence>(*device, fence_create_info);
+
+  image_available_semaphores.reserve(config.max_frames_in_flight);
+  render_finished_semaphores.reserve(config.max_frames_in_flight);
+  in_flight_fences.reserve(config.max_frames_in_flight);
+  for (uint32_t i = 0; i < config.max_frames_in_flight; ++i) {
+    image_available_semaphores.emplace_back(*device, semaphore_create_info);
+    render_finished_semaphores.emplace_back(*device, semaphore_create_info);
+    in_flight_fences.emplace_back(*device, fence_create_info);
+  }
 }
 
 void RenderEngine::render() {
-  (void)device->waitForFences(**in_flight_fence, true, UINT64_MAX);
-  device->resetFences(**in_flight_fence);
+  (void)device->waitForFences(*in_flight_fences[current_frame], true, UINT64_MAX);
+  device->resetFences(*in_flight_fences[current_frame]);
 
-  auto [result, image_index] = swap_chain->acquireNextImage(UINT32_MAX, *image_available_semaphore);
-  command_buffer->reset();
-  record_command_buffer(*command_buffer, image_index);
+  auto [result, image_index] 
+    = swap_chain->acquireNextImage(UINT32_MAX, *image_available_semaphores[current_frame]);
 
-  vk::Semaphore wait_semaphores[] = { **image_available_semaphore };
+  command_buffers[current_frame].reset();
+  record_command_buffer(command_buffers[current_frame], image_index);
+
+  vk::Semaphore wait_semaphores[] = { *image_available_semaphores[current_frame] };
   vk::PipelineStageFlags wait_stages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
-  vk::Semaphore signal_semaphores[] = { **render_finished_semaphore };
-  vk::CommandBuffer command_buffers[] = { **command_buffer };
+  vk::Semaphore signal_semaphores[] = { *render_finished_semaphores[current_frame] };
+  vk::CommandBuffer _command_buffers[] = { command_buffers[current_frame] };
   vk::SubmitInfo submit_info {
     .sType = vk::StructureType::eSubmitInfo,
     .waitSemaphoreCount = 1,
     .pWaitSemaphores = wait_semaphores,
     .pWaitDstStageMask = wait_stages,
     .commandBufferCount = 1,
-    .pCommandBuffers = command_buffers,
+    .pCommandBuffers = _command_buffers,
     .signalSemaphoreCount = 1,
     .pSignalSemaphores = signal_semaphores
   };
-  graphics_queue->submit(submit_info, *in_flight_fence);
+  graphics_queue->submit(submit_info, *in_flight_fences[current_frame]);
 
   vk::SwapchainKHR swap_chains[] = { **swap_chain };
   vk::PresentInfoKHR present_info {
@@ -721,8 +731,9 @@ void RenderEngine::render() {
     .pSwapchains = swap_chains,
     .pImageIndices = &image_index
   };
-
   (void)present_queue->presentKHR(present_info);
+
+  current_frame = (current_frame + 1) % config.max_frames_in_flight;
 }
 
 void RenderEngine::cleanup() {

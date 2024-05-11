@@ -39,7 +39,8 @@ void Application::init_render_engine() {
     },
     .vulkan = {
       .requested_layers = { "VK_LAYER_KHRONOS_validation" }
-    }
+    },
+    .max_frames_in_flight = 2
   };
 
   uint32_t required_extension_count;

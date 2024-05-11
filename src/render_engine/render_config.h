@@ -10,4 +10,6 @@ struct RenderConfig {
     std::vector<const char*> required_extensions;
     std::vector<const char*> requested_layers;
   } vulkan;
+
+  uint32_t max_frames_in_flight;
 };

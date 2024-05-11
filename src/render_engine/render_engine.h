@@ -16,7 +16,7 @@ public:
   void cleanup();
 
 private:
-  const RenderConfig& config;
+  const RenderConfig config;
   vk::raii::Context context;
 
   // Instance
@@ -113,10 +113,11 @@ private:
   // Command Buffer
   void create_command_buffer();
   void record_command_buffer(vk::raii::CommandBuffer&, uint32_t);
-  std::unique_ptr<vk::raii::CommandBuffer> command_buffer;
+  std::vector<vk::raii::CommandBuffer> command_buffers;
 
   // Rendering
-  std::unique_ptr<vk::raii::Semaphore> image_available_semaphore, render_finished_semaphore;
-  std::unique_ptr<vk::raii::Fence> in_flight_fence;
+  std::vector<vk::raii::Semaphore> image_available_semaphores, render_finished_semaphores;
+  std::vector<vk::raii::Fence> in_flight_fences;
   void create_sync_objects();
+  uint32_t current_frame;
 };

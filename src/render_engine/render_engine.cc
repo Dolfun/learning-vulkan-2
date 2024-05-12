@@ -16,14 +16,14 @@
 
 RenderEngine::RenderEngine(const RenderConfig& _config, const Application& application)
     : config { _config }, current_frame { 0 } {
-  init_instance();
-  init_debug_messenger();
-  init_window_surface(application);
-  init_physical_device();
-  init_logical_device();
-  init_queues();
-  init_swap_chain(application);
-  init_swap_chain_image_views();
+  create_instance();
+  create_debug_messenger();
+  create_window_surface(application);
+  select_physical_device();
+  create_logical_device();
+  query_queues();
+  create_swap_chain();
+  create_swap_chain_image_views();
   create_render_pass();
   create_graphics_pipeline();
   create_framebuffers();
@@ -32,7 +32,7 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   create_sync_objects();
 }
 
-void RenderEngine::init_instance() {
+void RenderEngine::create_instance() {
   vk::ApplicationInfo application_info {
     .sType = vk::StructureType::eApplicationInfo,
     .pApplicationName = "learning-vulkan-c++",
@@ -93,7 +93,7 @@ void RenderEngine::check_validation_layers_support() {
   }
 }
 
-void RenderEngine::init_debug_messenger() {
+void RenderEngine::create_debug_messenger() {
   auto create_info = get_debug_messenger_create_info();
   debug_messenger = std::make_unique<vk::raii::DebugUtilsMessengerEXT>(*instance, create_info);
 }
@@ -146,13 +146,13 @@ VKAPI_ATTR VkBool32 VKAPI_CALL RenderEngine::debug_callback(
   return VK_FALSE;
 }
 
-void RenderEngine::init_window_surface(const Application& application) {
+void RenderEngine::create_window_surface(const Application& application) {
   VkSurfaceKHR _surface;
   application.create_window_surface(**instance, _surface);
   surface = std::make_unique<vk::raii::SurfaceKHR>(*instance, _surface);
 }
 
-void RenderEngine::init_physical_device() {
+void RenderEngine::select_physical_device() {
   required_device_extensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
   };
@@ -221,7 +221,7 @@ auto RenderEngine::get_queue_family_indices(const vk::raii::PhysicalDevice& _dev
   return indices;
 }
 
-void RenderEngine::init_logical_device() {
+void RenderEngine::create_logical_device() {
   queue_family_indices = get_queue_family_indices(*physical_device);
   swap_chain_info = get_swap_chain_info(*physical_device);
 
@@ -266,7 +266,7 @@ void RenderEngine::init_logical_device() {
   device = std::make_unique<vk::raii::Device>(*physical_device, create_info);
 }
 
-void RenderEngine::init_queues() {
+void RenderEngine::query_queues() {
   graphics_queue = std::make_unique<vk::raii::Queue>(
     device->getQueue(queue_family_indices.graphics_family.value(), 0)
   );
@@ -287,16 +287,14 @@ auto RenderEngine::get_swap_chain_info(const vk::raii::PhysicalDevice& _device)
   return info;
 }
 
-auto RenderEngine::select_swap_chain_extent(const vk::SurfaceCapabilitiesKHR& capabilities,
-    const Application& application)
+auto RenderEngine::select_swap_chain_extent(const vk::SurfaceCapabilitiesKHR& capabilities)
      -> vk::Extent2D {
   if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
     return capabilities.currentExtent;
   } else {
-    auto [width, height] = application.get_framebuffer_size();
     vk::Extent2D extent = { 
-      static_cast<uint32_t>(width), 
-      static_cast<uint32_t>(height)
+      config.resolution.width,
+      config.resolution.height
     };
 
     auto min_extent = capabilities.minImageExtent;
@@ -328,8 +326,8 @@ auto RenderEngine::select_present_mode(const std::vector<vk::PresentModeKHR>& pr
   return vk::PresentModeKHR::eFifo;
 }
 
-void RenderEngine::init_swap_chain(const Application& application) {
-  auto extent = select_swap_chain_extent(swap_chain_info.capabilities, application);
+void RenderEngine::create_swap_chain() {
+  auto extent = select_swap_chain_extent(swap_chain_info.capabilities);
   auto surface_format = select_surface_format(swap_chain_info.formats);
   auto present_mode = select_present_mode(swap_chain_info.present_modes);
 
@@ -370,13 +368,14 @@ void RenderEngine::init_swap_chain(const Application& application) {
     create_info.pQueueFamilyIndices = nullptr;
   }
 
+  fmt::println("width = {}, height = {}", config.resolution.width, config.resolution.height);
   swap_chain = std::make_unique<vk::raii::SwapchainKHR>(*device, create_info);
   swap_chain_images = swap_chain->getImages();
   swap_chain_extent = extent;
   swap_chain_image_format = surface_format.format;
 }
 
-void RenderEngine::init_swap_chain_image_views() {
+void RenderEngine::create_swap_chain_image_views() {
   auto size = swap_chain_images.size();
   swap_chain_image_views.reserve(size);
   for (size_t i = 0; i < size; ++i) {
@@ -736,6 +735,6 @@ void RenderEngine::render() {
   current_frame = (current_frame + 1) % config.max_frames_in_flight;
 }
 
-void RenderEngine::cleanup() {
+void RenderEngine::wait_to_finish() const {
   device->waitIdle();
 }

@@ -32,10 +32,13 @@ void Application::init_glfw() {
 }
 
 void Application::init_render_engine() {
+  int framebuffer_width, framebuffer_height;
+  glfwGetFramebufferSize(window, &framebuffer_width, &framebuffer_height);
+
   RenderConfig render_config {
     .resolution = {
-      .width = info.window.width,
-      .height = info.window.height
+      .width = static_cast<uint32_t>(framebuffer_width),
+      .height = static_cast<uint32_t>(framebuffer_height)
     },
     .vulkan = {
       .requested_layers = { "VK_LAYER_KHRONOS_validation" }
@@ -67,6 +70,8 @@ void Application::run() {
 
     render_engine->render();
   }
+
+  render_engine->wait_to_finish();
 }
 
 void Application::create_window_surface(const VkInstance& instance, VkSurfaceKHR& surface) const {
@@ -75,15 +80,7 @@ void Application::create_window_surface(const VkInstance& instance, VkSurfaceKHR
   }
 }
 
-std::pair<int, int> Application::get_framebuffer_size() const {
-  std::pair<int, int> framebuffer_size;
-  glfwGetFramebufferSize(window, &framebuffer_size.first, &framebuffer_size.second);
-  return framebuffer_size;
-}
-
 Application::~Application() {
-  render_engine->cleanup();
-
   glfwDestroyWindow(window);
   glfwTerminate();
 }

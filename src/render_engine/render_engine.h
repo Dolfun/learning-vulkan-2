@@ -13,20 +13,20 @@ public:
   RenderEngine(const RenderConfig&, const Application&);
 
   void render();
-  void cleanup();
+  void wait_to_finish() const;
 
 private:
   const RenderConfig config;
   vk::raii::Context context;
 
   // Instance
-  void init_instance();
+  void create_instance();
   void check_required_extensions_support();
   void check_validation_layers_support();
   std::unique_ptr<vk::raii::Instance> instance;
 
   // Debug Messenger
-  void init_debug_messenger();
+  void create_debug_messenger();
   auto get_debug_messenger_create_info() 
     -> vk::DebugUtilsMessengerCreateInfoEXT;
   static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
@@ -37,11 +37,11 @@ private:
   std::unique_ptr<vk::raii::DebugUtilsMessengerEXT> debug_messenger;
 
   // Window Surface
-  void init_window_surface(const Application&);
+  void create_window_surface(const Application&);
   std::unique_ptr<vk::raii::SurfaceKHR> surface;
 
   // Physical Device
-  void init_physical_device();
+  void select_physical_device();
   bool is_device_suitable(const vk::raii::PhysicalDevice&);
   std::vector<const char*> required_device_extensions;
   std::unique_ptr<vk::raii::PhysicalDevice> physical_device;
@@ -59,11 +59,11 @@ private:
     -> QueueFamilyIndices;
 
   // Logical Device
-  void init_logical_device();
+  void create_logical_device();
   std::unique_ptr<vk::raii::Device> device;
 
   // Queues
-  void init_queues();
+  void query_queues();
   std::unique_ptr<vk::raii::Queue> graphics_queue;
   std::unique_ptr<vk::raii::Queue> present_queue;
 
@@ -73,15 +73,11 @@ private:
     std::vector<vk::SurfaceFormatKHR> formats;
     std::vector<vk::PresentModeKHR> present_modes;
   } swap_chain_info;
-  auto get_swap_chain_info(const vk::raii::PhysicalDevice&)
-    -> SwapChainInfo;
-  auto select_swap_chain_extent(const vk::SurfaceCapabilitiesKHR&, const Application&)
-    -> vk::Extent2D;
-  auto select_surface_format(const std::vector<vk::SurfaceFormatKHR>&)
-    -> vk::SurfaceFormatKHR;
-  auto select_present_mode(const std::vector<vk::PresentModeKHR>&)
-    -> vk::PresentModeKHR;
-  void init_swap_chain(const Application&);
+  auto get_swap_chain_info(const vk::raii::PhysicalDevice&) -> SwapChainInfo;
+  auto select_swap_chain_extent(const vk::SurfaceCapabilitiesKHR&) -> vk::Extent2D;
+  auto select_surface_format(const std::vector<vk::SurfaceFormatKHR>&) -> vk::SurfaceFormatKHR;
+  auto select_present_mode(const std::vector<vk::PresentModeKHR>&) -> vk::PresentModeKHR;
+  void create_swap_chain();
   std::unique_ptr<vk::raii::SwapchainKHR> swap_chain;
   std::vector<vk::Image> swap_chain_images;
   vk::Format swap_chain_image_format;
@@ -89,7 +85,7 @@ private:
 
   // Image Views
   std::vector<vk::raii::ImageView> swap_chain_image_views;
-  void init_swap_chain_image_views();
+  void create_swap_chain_image_views();
 
   // Render Pass
   void create_render_pass();

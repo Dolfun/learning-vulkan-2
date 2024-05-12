@@ -3,7 +3,7 @@
 
 struct RenderConfig {
   struct Resolution {
-    size_t width, height;
+    uint32_t width, height;
   } resolution;
 
   struct VulkanInfo {

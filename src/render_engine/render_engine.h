@@ -85,12 +85,16 @@ private:
   vk::Extent2D swap_chain_extent;
 
   // Image Views
-  std::vector<vk::raii::ImageView> swap_chain_image_views;
   void create_swap_chain_image_views();
+  std::vector<vk::raii::ImageView> swap_chain_image_views;
 
   // Render Pass
   void create_render_pass();
   std::unique_ptr<vk::raii::RenderPass> render_pass;
+
+  // Descriptor set layout
+  void create_descriptor_set_layout();
+  std::unique_ptr<vk::raii::DescriptorSetLayout> descriptor_set_layout;
 
   // Graphics Pipeline
   void create_graphics_pipeline();
@@ -107,17 +111,30 @@ private:
   void create_command_pool();
   std::unique_ptr<vk::raii::CommandPool> command_pool;
 
+  // Uniform Buffers
+  void create_uniform_buffers();
+  void update_uniform_buffer(uint32_t);
+  std::vector<vk::raii::Buffer> uniform_buffers;
+  std::vector<vk::raii::DeviceMemory> uniform_buffer_memories;
+  std::vector<void*> uniform_buffer_ptrs;
+
+  // Descriptors
+  void create_descriptor_pool();
+  void create_descriptor_sets();
+  std::unique_ptr<vk::raii::DescriptorPool> descriptor_pool;
+  std::vector<vk::raii::DescriptorSet> descriptor_sets;
+
   // Buffers
+  uint32_t find_memory_type(uint32_t, vk::MemoryPropertyFlags);
+  auto create_buffer(vk::DeviceSize, vk::BufferUsageFlags, vk::MemoryPropertyFlags)
+    -> std::pair<vk::raii::Buffer, vk::raii::DeviceMemory>;
+  void copy_buffer(vk::Buffer, vk::Buffer, vk::DeviceSize);
+  void create_vertex_buffer();
+  void create_index_buffer();
   std::unique_ptr<vk::raii::Buffer> vertex_buffer;
   std::unique_ptr<vk::raii::DeviceMemory> vertex_buffer_memory;
   std::unique_ptr<vk::raii::Buffer> index_buffer;
   std::unique_ptr<vk::raii::DeviceMemory> index_buffer_memory;
-  uint32_t find_memory_type(uint32_t, vk::MemoryPropertyFlags);
-  auto create_buffer(vk::DeviceSize, vk::BufferUsageFlags, vk::MemoryPropertyFlags)
-    -> std::pair<std::unique_ptr<vk::raii::Buffer>, std::unique_ptr<vk::raii::DeviceMemory>>;
-  void copy_buffer(vk::Buffer, vk::Buffer, vk::DeviceSize);
-  void create_vertex_buffer();
-  void create_index_buffer();
 
   // Command Buffer
   void create_command_buffer();
@@ -125,8 +142,8 @@ private:
   std::vector<vk::raii::CommandBuffer> command_buffers;
 
   // Rendering
+  void create_sync_objects();
   std::vector<vk::raii::Semaphore> image_available_semaphores, render_finished_semaphores;
   std::vector<vk::raii::Fence> in_flight_fences;
-  void create_sync_objects();
   uint32_t current_frame;
 };

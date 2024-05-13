@@ -1,13 +1,16 @@
 #include "render_engine.h"
-#include <glm/glm.hpp>
 #include <algorithm>
 #include <fmt/core.h>
 #include <fmt/color.h>
 #include <fstream>
+#include <chrono>
 #include <limits>
 #include <array>
 #include <set>
 #include "../application/application.h"
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #ifdef NDEBUG
   constexpr bool enable_validation_layers = false;
@@ -37,6 +40,12 @@ const Mesh mesh {
   }
 };
 
+struct TransformMatrices {
+  glm::mat4 model;
+  glm::mat4 view;
+  glm::mat4 projection;
+};
+
 RenderEngine::RenderEngine(const RenderConfig& _config, const Application& application)
     : config { _config }, current_frame { 0 } {
   create_instance();
@@ -48,9 +57,13 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   create_swap_chain();
   create_swap_chain_image_views();
   create_render_pass();
+  create_descriptor_set_layout();
   create_graphics_pipeline();
   create_framebuffers();
   create_command_pool();
+  create_uniform_buffers();
+  create_descriptor_pool();
+  create_descriptor_sets();
   create_vertex_buffer();
   create_index_buffer();
   create_command_buffer();
@@ -464,8 +477,23 @@ void RenderEngine::create_render_pass() {
   render_pass = std::make_unique<vk::raii::RenderPass>(*device, create_info);
 }
 
+void RenderEngine::create_descriptor_set_layout() {
+  vk::DescriptorSetLayoutBinding ubo_layout_bounding {
+    .binding = 0,
+    .descriptorType = vk::DescriptorType::eUniformBuffer,
+    .descriptorCount = 1,
+    .stageFlags = vk::ShaderStageFlagBits::eVertex
+  };
+
+  vk::DescriptorSetLayoutCreateInfo create_info {
+    .bindingCount = 1,
+    .pBindings = &ubo_layout_bounding
+  };
+
+  descriptor_set_layout = std::make_unique<vk::raii::DescriptorSetLayout>(*device, create_info);
+}
+
 void RenderEngine::create_graphics_pipeline() {
-  // Shader Stage
   auto vertex_shader_code = read_file("shaders/main.vert.spv");
   auto fragment_shader_code = read_file("shaders/main.frag.spv");
   auto vertex_shader_module = create_shader_module(vertex_shader_code);
@@ -487,7 +515,6 @@ void RenderEngine::create_graphics_pipeline() {
     vertex_shader_stage_create_info, fragment_shader_stage_create_info
   };
 
-  // Vertex Input
   vk::VertexInputBindingDescription binding_description {
     .binding = 0,
     .stride = sizeof(Vertex),
@@ -516,13 +543,11 @@ void RenderEngine::create_graphics_pipeline() {
     .pVertexAttributeDescriptions = attribute_descriptions.data()
   };
 
-  // Input Assembly
   vk::PipelineInputAssemblyStateCreateInfo input_assembly_state_create_info {
     .topology = vk::PrimitiveTopology::eTriangleList,
     .primitiveRestartEnable = false
   };
 
-  // Dynamic State
   std::array dynamic_states {
     vk::DynamicState::eViewport,
     vk::DynamicState::eScissor
@@ -543,7 +568,7 @@ void RenderEngine::create_graphics_pipeline() {
     .rasterizerDiscardEnable = false,
     .polygonMode = vk::PolygonMode::eFill,
     .cullMode = vk::CullModeFlagBits::eBack,
-    .frontFace = vk::FrontFace::eClockwise,
+    .frontFace = vk::FrontFace::eCounterClockwise,
     .depthBiasEnable = false,
     .lineWidth = 1.0f
   };
@@ -564,7 +589,10 @@ void RenderEngine::create_graphics_pipeline() {
     .pAttachments = &color_blend_attachment_state
   };
 
+  vk::DescriptorSetLayout set_layouts[] = { **descriptor_set_layout };
   vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
+    .setLayoutCount = 1,
+    .pSetLayouts = set_layouts
   };
   pipeline_layout = std::make_unique<vk::raii::PipelineLayout>(*device, pipeline_layout_create_info);
 
@@ -650,23 +678,103 @@ uint32_t RenderEngine::find_memory_type(uint32_t type_filter, vk::MemoryProperty
   throw std::runtime_error("Failed to find suitable memory type.");
 }
 
+void RenderEngine::create_uniform_buffers() {
+  using enum vk::MemoryPropertyFlagBits;
+  using enum vk::BufferUsageFlagBits;
+
+  vk::DeviceSize buffer_size = sizeof(TransformMatrices);
+
+  uniform_buffers.reserve(config.max_frames_in_flight);
+  uniform_buffer_memories.reserve(config.max_frames_in_flight);
+  uniform_buffer_ptrs.resize(config.max_frames_in_flight);
+
+  for (uint32_t i = 0; i < config.max_frames_in_flight; ++i) {
+    auto [buffer, memory] = 
+      create_buffer(buffer_size, eUniformBuffer, eHostVisible | eHostCoherent);
+    uniform_buffer_ptrs[i] = memory.mapMemory(0, buffer_size);
+    uniform_buffer_memories.emplace_back(std::move(memory));
+    uniform_buffers.emplace_back(std::move(buffer));
+  }
+}
+
+void RenderEngine::update_uniform_buffer(uint32_t index) {
+  static auto prev_time = std::chrono::high_resolution_clock::now();
+  auto curr_time = std::chrono::high_resolution_clock::now();
+  float time = std::chrono::duration<float, std::chrono::seconds::period>(curr_time - prev_time).count();
+
+  float aspect_ratio = static_cast<float>(config.resolution.width) / config.resolution.height;
+  TransformMatrices transformation {
+    .model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+    .view = glm::lookAt(glm::vec3(2.0f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+    .projection = glm::perspective(glm::radians(45.0f), aspect_ratio, 0.1f, 10.0f)
+  };
+  transformation.projection[1][1] *= -1.0f;
+
+  std::memcpy(uniform_buffer_ptrs[index], static_cast<const void*>(&transformation), sizeof(TransformMatrices));
+}
+
+void RenderEngine::create_descriptor_pool() {
+  vk::DescriptorPoolSize pool_size {
+    .type = vk::DescriptorType::eUniformBuffer,
+    .descriptorCount = config.max_frames_in_flight
+  };
+
+  vk::DescriptorPoolCreateInfo create_info {
+    .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+    .maxSets = config.max_frames_in_flight,
+    .poolSizeCount = 1,
+    .pPoolSizes = &pool_size
+  };
+
+  descriptor_pool = std::make_unique<vk::raii::DescriptorPool>(*device, create_info);
+}
+
+void RenderEngine::create_descriptor_sets() {
+  std::vector<vk::DescriptorSetLayout> layouts(config.max_frames_in_flight, *descriptor_set_layout);
+  vk::DescriptorSetAllocateInfo allocate_info {
+    .descriptorPool = *descriptor_pool,
+    .descriptorSetCount = config.max_frames_in_flight,
+    .pSetLayouts = layouts.data()
+  };
+
+  descriptor_sets = device->allocateDescriptorSets(allocate_info);
+  for (uint32_t i = 0; i < config.max_frames_in_flight; ++i) {
+    vk::DescriptorBufferInfo buffer_info {
+      .buffer = uniform_buffers[i],
+      .offset = 0,
+      .range = sizeof(TransformMatrices)
+    };
+
+    vk::WriteDescriptorSet descriptor_write {
+      .dstSet = descriptor_sets[i],
+      .dstBinding = 0,
+      .dstArrayElement = 0,
+      .descriptorCount = 1,
+      .descriptorType = vk::DescriptorType::eUniformBuffer,
+      .pBufferInfo = &buffer_info
+    };
+
+    device->updateDescriptorSets(descriptor_write, nullptr);
+  }
+}
+
 auto RenderEngine::create_buffer(
   vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
-    -> std::pair<std::unique_ptr<vk::raii::Buffer>, std::unique_ptr<vk::raii::DeviceMemory>> {
+    -> std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> {
   vk::BufferCreateInfo create_info {
     .size = size,
     .usage = usage,
     .sharingMode = vk::SharingMode::eExclusive
   };
-  auto buffer = std::make_unique<vk::raii::Buffer>(*device, create_info);
-  auto memory_requirements = buffer->getMemoryRequirements();
+  vk::raii::Buffer buffer { *device, create_info };
+  auto memory_requirements = buffer.getMemoryRequirements();
 
   vk::MemoryAllocateInfo allocate_info {
     .allocationSize = memory_requirements.size,
     .memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, properties)
   };
-  auto memory = std::make_unique<vk::raii::DeviceMemory>(*device, allocate_info);
-  buffer->bindMemory(*memory, 0);
+  vk::raii::DeviceMemory memory { *device, allocate_info };
+  buffer.bindMemory(*memory, 0);
   return std::make_pair(std::move(buffer), std::move(memory));
 }
 
@@ -691,7 +799,6 @@ void RenderEngine::copy_buffer(vk::Buffer src_buffer, vk::Buffer dst_buffer, vk:
   command_buffer.copyBuffer(src_buffer, dst_buffer, copy_region);
   command_buffer.end();
 
-
   vk::SubmitInfo submit_info {
     .commandBufferCount = 1,
     .pCommandBuffers = &command_buffer
@@ -708,13 +815,16 @@ void RenderEngine::create_vertex_buffer() {
   auto [staging_buffer, staging_buffer_memory] = 
     create_buffer(buffer_size, eTransferSrc, eHostVisible | eHostCoherent);
 
-  void* data = staging_buffer_memory->mapMemory(0, buffer_size);
+  void* data = staging_buffer_memory.mapMemory(0, buffer_size);
   std::memcpy(data, static_cast<const void*>(mesh.vertices.data()), buffer_size);
-  staging_buffer_memory->unmapMemory();
+  staging_buffer_memory.unmapMemory();
 
-  std::tie(vertex_buffer, vertex_buffer_memory) = 
+  auto [buffer, memory] = 
     create_buffer(buffer_size, eTransferDst | eVertexBuffer, eDeviceLocal);
-  copy_buffer(**staging_buffer, **vertex_buffer, buffer_size);
+  copy_buffer(*staging_buffer, *buffer, buffer_size);
+
+  vertex_buffer = std::make_unique<vk::raii::Buffer>(std::move(buffer));
+  vertex_buffer_memory = std::make_unique<vk::raii::DeviceMemory>(std::move(memory));
 }
 
 void RenderEngine::create_index_buffer() {
@@ -725,13 +835,16 @@ void RenderEngine::create_index_buffer() {
   auto [staging_buffer, staging_buffer_memory] =
     create_buffer(buffer_size, eTransferSrc, eHostVisible | eHostCoherent);
   
-  void* data = staging_buffer_memory->mapMemory(0, buffer_size);
+  void* data = staging_buffer_memory.mapMemory(0, buffer_size);
   std::memcpy(data, static_cast<const void*>(mesh.indices.data()), buffer_size);
-  staging_buffer_memory->unmapMemory();
+  staging_buffer_memory.unmapMemory();
 
-  std::tie(index_buffer, index_buffer_memory) =
+  auto [buffer, memory] = 
     create_buffer(buffer_size, eTransferDst | eIndexBuffer, eDeviceLocal);
-  copy_buffer(**staging_buffer, **index_buffer, buffer_size);
+  copy_buffer(*staging_buffer, *buffer, buffer_size);
+
+  index_buffer = std::make_unique<vk::raii::Buffer>(std::move(buffer));
+  index_buffer_memory = std::make_unique<vk::raii::DeviceMemory>(std::move(memory));
 }
 
 void RenderEngine::create_command_buffer() {
@@ -784,7 +897,9 @@ void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& command_buffer
 
   command_buffer.bindVertexBuffers(0, { **vertex_buffer }, { 0 });
   command_buffer.bindIndexBuffer(*index_buffer, 0, vk::IndexType::eUint16);
-
+  command_buffer.bindDescriptorSets(
+    vk::PipelineBindPoint::eGraphics, *pipeline_layout, 0, { *descriptor_sets[current_frame] }, nullptr
+  );
   command_buffer.drawIndexed(static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
 
   command_buffer.endRenderPass();
@@ -817,6 +932,8 @@ void RenderEngine::render() {
 
   command_buffers[current_frame].reset();
   record_command_buffer(command_buffers[current_frame], image_index);
+
+  update_uniform_buffer(current_frame);
 
   vk::Semaphore wait_semaphores[] = { *image_available_semaphores[current_frame] };
   vk::PipelineStageFlags wait_stages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };

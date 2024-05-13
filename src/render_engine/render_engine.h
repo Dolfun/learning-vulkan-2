@@ -102,6 +102,12 @@ private:
   void create_framebuffers();
   std::vector<vk::raii::Framebuffer> swap_chain_framebuffers;
 
+  // Vertex Buffer
+  std::unique_ptr<vk::raii::Buffer> vertex_buffer;
+  std::unique_ptr<vk::raii::DeviceMemory> vertex_buffer_memory;
+  uint32_t find_memory_type(uint32_t, vk::MemoryPropertyFlags);
+  void create_vertex_buffer();
+
   // Command Pool
   void create_command_pool();
   std::unique_ptr<vk::raii::CommandPool> command_pool;

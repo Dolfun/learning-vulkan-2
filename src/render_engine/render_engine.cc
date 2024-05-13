@@ -1,4 +1,5 @@
 #include "render_engine.h"
+#include <glm/glm.hpp>
 #include <algorithm>
 #include <fmt/core.h>
 #include <fmt/color.h>
@@ -14,6 +15,17 @@
   constexpr bool enable_validation_layers = true;
 #endif
 
+struct Vertex {
+  glm::vec2 position;
+  glm::vec3 color;
+};
+
+const std::vector<Vertex> vertices = {
+  { { 0.0f, -0.5f }, { 1.0f, 0.0f, 0.0f } },
+  { { 0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
+  { {-0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } }
+};
+
 RenderEngine::RenderEngine(const RenderConfig& _config, const Application& application)
     : config { _config }, current_frame { 0 } {
   create_instance();
@@ -27,6 +39,7 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   create_render_pass();
   create_graphics_pipeline();
   create_framebuffers();
+  create_vertex_buffer();
   create_command_pool();
   create_command_buffer();
   create_sync_objects();
@@ -368,7 +381,6 @@ void RenderEngine::create_swap_chain() {
     create_info.pQueueFamilyIndices = nullptr;
   }
 
-  fmt::println("width = {}, height = {}", config.resolution.width, config.resolution.height);
   swap_chain = std::make_unique<vk::raii::SwapchainKHR>(*device, create_info);
   swap_chain_images = swap_chain->getImages();
   swap_chain_extent = extent;
@@ -474,12 +486,33 @@ void RenderEngine::create_graphics_pipeline() {
   };
 
   // Vertex Input
+  vk::VertexInputBindingDescription binding_description {
+    .binding = 0,
+    .stride = sizeof(Vertex),
+    .inputRate = vk::VertexInputRate::eVertex
+  };
+
+  std::array<vk::VertexInputAttributeDescription, 2> attribute_descriptions;
+  attribute_descriptions[0] = {
+    .location = 0,
+    .binding = 0,
+    .format = vk::Format::eR32G32Sfloat,
+    .offset = offsetof(Vertex, position)
+  };
+  
+  attribute_descriptions[1] = {
+    .location = 1,
+    .binding = 0,
+    .format = vk::Format::eR32G32B32Sfloat,
+    .offset = offsetof(Vertex, color)
+  };
+
   vk::PipelineVertexInputStateCreateInfo vertex_input_state_create_info {
     .sType = vk::StructureType::ePipelineVertexInputStateCreateInfo,
-    .vertexBindingDescriptionCount = 0,
-    .pVertexBindingDescriptions = nullptr,
-    .vertexAttributeDescriptionCount = 0,
-    .pVertexAttributeDescriptions = nullptr
+    .vertexBindingDescriptionCount = 1,
+    .pVertexBindingDescriptions = &binding_description,
+    .vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descriptions.size()),
+    .pVertexAttributeDescriptions = attribute_descriptions.data()
   };
 
   // Input Assembly
@@ -607,6 +640,41 @@ void RenderEngine::create_framebuffers() {
   }
 }
 
+uint32_t RenderEngine::find_memory_type(uint32_t type_filter, vk::MemoryPropertyFlags flags) {
+  auto properties = physical_device->getMemoryProperties();
+  for (uint32_t i = 0; i < properties.memoryTypeCount; ++i) {
+    if (type_filter & (1 << i) && (properties.memoryTypes[i].propertyFlags & flags) == flags) {
+      return i;
+    }
+  }
+  throw std::runtime_error("Failed to find suitable memory type.");
+}
+
+void RenderEngine::create_vertex_buffer() {
+  vk::BufferCreateInfo create_info {
+    .sType = vk::StructureType::eBufferCreateInfo,
+    .size = sizeof(Vertex) * vertices.size(),
+    .usage = vk::BufferUsageFlagBits::eVertexBuffer,
+    .sharingMode = vk::SharingMode::eExclusive
+  };
+  vertex_buffer = std::make_unique<vk::raii::Buffer>(*device, create_info);
+  auto memory_requirements = vertex_buffer->getMemoryRequirements();
+
+  auto flags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
+  vk::MemoryAllocateInfo allocate_info {
+    .sType = vk::StructureType::eMemoryAllocateInfo,
+    .allocationSize = memory_requirements.size,
+    .memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, flags)
+  };
+  vertex_buffer_memory = std::make_unique<vk::raii::DeviceMemory>(*device, allocate_info);
+
+  vertex_buffer->bindMemory(*vertex_buffer_memory, 0);
+
+  void* data = vertex_buffer_memory->mapMemory(0, create_info.size);
+    std::memcpy(data, static_cast<const void*>(vertices.data()), create_info.size);
+  vertex_buffer_memory->unmapMemory();
+}
+
 void RenderEngine::create_command_pool() {
   vk::CommandPoolCreateInfo create_info {
     .sType = vk::StructureType::eCommandPoolCreateInfo,
@@ -669,7 +737,11 @@ void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& command_buffer
   };
   command_buffer.setScissor(0, scissor);
 
-  command_buffer.draw(3, 1, 0, 0);
+  vk::Buffer vertex_buffers[] = { **vertex_buffer };
+  vk::DeviceSize offsets[] = { 0 };
+  command_buffer.bindVertexBuffers(0, vertex_buffers, offsets);
+
+  command_buffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
   command_buffer.endRenderPass();
   command_buffer.end();

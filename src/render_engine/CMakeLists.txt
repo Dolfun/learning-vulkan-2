@@ -7,7 +7,7 @@ set(
 
 add_library(render_engine ${render_engine_sources})
 target_compile_features(render_engine PUBLIC cxx_std_20)
-target_link_libraries(render_engine PUBLIC Vulkan::Vulkan PRIVATE fmt::fmt)
+target_link_libraries(render_engine PUBLIC Vulkan::Vulkan PRIVATE fmt::fmt glm::glm)
 target_include_directories(render_engine PUBLIC .)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

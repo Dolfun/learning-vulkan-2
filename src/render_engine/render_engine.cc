@@ -39,8 +39,8 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   create_render_pass();
   create_graphics_pipeline();
   create_framebuffers();
-  create_vertex_buffer();
   create_command_pool();
+  create_vertex_buffer();
   create_command_buffer();
   create_sync_objects();
 }
@@ -640,6 +640,16 @@ void RenderEngine::create_framebuffers() {
   }
 }
 
+void RenderEngine::create_command_pool() {
+  vk::CommandPoolCreateInfo create_info {
+    .sType = vk::StructureType::eCommandPoolCreateInfo,
+    .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+    .queueFamilyIndex = queue_family_indices.graphics_family.value()
+  };
+
+  command_pool = std::make_unique<vk::raii::CommandPool>(*device, create_info);
+}
+
 uint32_t RenderEngine::find_memory_type(uint32_t type_filter, vk::MemoryPropertyFlags flags) {
   auto properties = physical_device->getMemoryProperties();
   for (uint32_t i = 0; i < properties.memoryTypeCount; ++i) {
@@ -650,39 +660,76 @@ uint32_t RenderEngine::find_memory_type(uint32_t type_filter, vk::MemoryProperty
   throw std::runtime_error("Failed to find suitable memory type.");
 }
 
-void RenderEngine::create_vertex_buffer() {
+auto RenderEngine::create_buffer(
+  vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
+    -> std::pair<std::unique_ptr<vk::raii::Buffer>, std::unique_ptr<vk::raii::DeviceMemory>> {
   vk::BufferCreateInfo create_info {
     .sType = vk::StructureType::eBufferCreateInfo,
-    .size = sizeof(Vertex) * vertices.size(),
-    .usage = vk::BufferUsageFlagBits::eVertexBuffer,
+    .size = size,
+    .usage = usage,
     .sharingMode = vk::SharingMode::eExclusive
   };
-  vertex_buffer = std::make_unique<vk::raii::Buffer>(*device, create_info);
-  auto memory_requirements = vertex_buffer->getMemoryRequirements();
+  auto buffer = std::make_unique<vk::raii::Buffer>(*device, create_info);
+  auto memory_requirements = buffer->getMemoryRequirements();
 
-  auto flags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
   vk::MemoryAllocateInfo allocate_info {
     .sType = vk::StructureType::eMemoryAllocateInfo,
     .allocationSize = memory_requirements.size,
-    .memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, flags)
+    .memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, properties)
   };
-  vertex_buffer_memory = std::make_unique<vk::raii::DeviceMemory>(*device, allocate_info);
-
-  vertex_buffer->bindMemory(*vertex_buffer_memory, 0);
-
-  void* data = vertex_buffer_memory->mapMemory(0, create_info.size);
-    std::memcpy(data, static_cast<const void*>(vertices.data()), create_info.size);
-  vertex_buffer_memory->unmapMemory();
+  auto memory = std::make_unique<vk::raii::DeviceMemory>(*device, allocate_info);
+  buffer->bindMemory(*memory, 0);
+  return std::make_pair(std::move(buffer), std::move(memory));
 }
 
-void RenderEngine::create_command_pool() {
-  vk::CommandPoolCreateInfo create_info {
-    .sType = vk::StructureType::eCommandPoolCreateInfo,
-    .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-    .queueFamilyIndex = queue_family_indices.graphics_family.value()
+void RenderEngine::copy_buffer(vk::Buffer src_buffer, vk::Buffer dst_buffer, vk::DeviceSize size) {
+  vk::CommandBufferAllocateInfo command_buffer_allocate_info {
+    .sType = vk::StructureType::eCommandBufferAllocateInfo,
+    .commandPool = *command_pool,
+    .level = vk::CommandBufferLevel::ePrimary,
+    .commandBufferCount = 1
   };
 
-  command_pool = std::make_unique<vk::raii::CommandPool>(*device, create_info);
+  vk::raii::CommandBuffers transfer_command_buffers { *device, command_buffer_allocate_info };
+  auto command_buffer = *transfer_command_buffers[0];
+
+  vk::CommandBufferBeginInfo begin_info {
+    .sType = vk::StructureType::eCommandBufferBeginInfo,
+    .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+  };
+  command_buffer.begin(begin_info);
+
+  vk::BufferCopy copy_region {
+    .size = size
+  };
+  command_buffer.copyBuffer(src_buffer, dst_buffer, copy_region);
+  command_buffer.end();
+
+
+  vk::SubmitInfo submit_info {
+    .sType = vk::StructureType::eSubmitInfo,
+    .commandBufferCount = 1,
+    .pCommandBuffers = &command_buffer
+  };
+  graphics_queue->submit(submit_info);
+  graphics_queue->waitIdle();
+}
+
+void RenderEngine::create_vertex_buffer() {
+  using enum vk::MemoryPropertyFlagBits;
+  using enum vk::BufferUsageFlagBits;
+
+  vk::DeviceSize buffer_size = sizeof(Vertex) * vertices.size();
+  auto [staging_buffer, staging_buffer_memory] = 
+    create_buffer(buffer_size, eTransferSrc, eHostVisible | eHostCoherent);
+
+  void* data = staging_buffer_memory->mapMemory(0, buffer_size);
+    std::memcpy(data, static_cast<const void*>(vertices.data()), buffer_size);
+  staging_buffer_memory->unmapMemory();
+
+  std::tie(vertex_buffer, vertex_buffer_memory) = 
+    create_buffer(buffer_size, eTransferDst | eVertexBuffer, eDeviceLocal);
+  copy_buffer(**staging_buffer, **vertex_buffer, buffer_size);
 }
 
 void RenderEngine::create_command_buffer() {

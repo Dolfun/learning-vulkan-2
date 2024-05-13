@@ -107,14 +107,17 @@ private:
   void create_command_pool();
   std::unique_ptr<vk::raii::CommandPool> command_pool;
 
-  // Vertex Buffer
+  // Buffers
   std::unique_ptr<vk::raii::Buffer> vertex_buffer;
   std::unique_ptr<vk::raii::DeviceMemory> vertex_buffer_memory;
+  std::unique_ptr<vk::raii::Buffer> index_buffer;
+  std::unique_ptr<vk::raii::DeviceMemory> index_buffer_memory;
   uint32_t find_memory_type(uint32_t, vk::MemoryPropertyFlags);
   auto create_buffer(vk::DeviceSize, vk::BufferUsageFlags, vk::MemoryPropertyFlags)
     -> std::pair<std::unique_ptr<vk::raii::Buffer>, std::unique_ptr<vk::raii::DeviceMemory>>;
   void copy_buffer(vk::Buffer, vk::Buffer, vk::DeviceSize);
   void create_vertex_buffer();
+  void create_index_buffer();
 
   // Command Buffer
   void create_command_buffer();

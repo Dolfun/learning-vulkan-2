@@ -20,10 +20,21 @@ struct Vertex {
   glm::vec3 color;
 };
 
-const std::vector<Vertex> vertices = {
-  { { 0.0f, -0.5f }, { 1.0f, 0.0f, 0.0f } },
-  { { 0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f } },
-  { {-0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f } }
+struct Mesh {
+  std::vector<Vertex> vertices;
+  std::vector<uint16_t> indices;
+};
+
+const Mesh mesh {
+  .vertices = {
+    { {-0.5f, -0.5f}, { 1.0f, 0.0f, 0.0f } },
+    { { 0.5f, -0.5f}, { 0.0f, 1.0f, 0.0f } },
+    { { 0.5f,  0.5f}, { 0.0f, 0.0f, 1.0f } },
+    { {-0.5f,  0.5f}, { 1.0f, 1.0f, 1.0f } }
+  },
+  .indices = {
+    0, 1, 2, 2, 3, 0
+  }
 };
 
 RenderEngine::RenderEngine(const RenderConfig& _config, const Application& application)
@@ -41,6 +52,7 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
   create_framebuffers();
   create_command_pool();
   create_vertex_buffer();
+  create_index_buffer();
   create_command_buffer();
   create_sync_objects();
 }
@@ -692,17 +704,34 @@ void RenderEngine::create_vertex_buffer() {
   using enum vk::MemoryPropertyFlagBits;
   using enum vk::BufferUsageFlagBits;
 
-  vk::DeviceSize buffer_size = sizeof(Vertex) * vertices.size();
+  vk::DeviceSize buffer_size = sizeof(Vertex) * mesh.vertices.size();
   auto [staging_buffer, staging_buffer_memory] = 
     create_buffer(buffer_size, eTransferSrc, eHostVisible | eHostCoherent);
 
   void* data = staging_buffer_memory->mapMemory(0, buffer_size);
-    std::memcpy(data, static_cast<const void*>(vertices.data()), buffer_size);
+  std::memcpy(data, static_cast<const void*>(mesh.vertices.data()), buffer_size);
   staging_buffer_memory->unmapMemory();
 
   std::tie(vertex_buffer, vertex_buffer_memory) = 
     create_buffer(buffer_size, eTransferDst | eVertexBuffer, eDeviceLocal);
   copy_buffer(**staging_buffer, **vertex_buffer, buffer_size);
+}
+
+void RenderEngine::create_index_buffer() {
+  using enum vk::MemoryPropertyFlagBits;
+  using enum vk::BufferUsageFlagBits;
+  
+  vk::DeviceSize buffer_size = sizeof(uint16_t) * mesh.indices.size();
+  auto [staging_buffer, staging_buffer_memory] =
+    create_buffer(buffer_size, eTransferSrc, eHostVisible | eHostCoherent);
+  
+  void* data = staging_buffer_memory->mapMemory(0, buffer_size);
+  std::memcpy(data, static_cast<const void*>(mesh.indices.data()), buffer_size);
+  staging_buffer_memory->unmapMemory();
+
+  std::tie(index_buffer, index_buffer_memory) =
+    create_buffer(buffer_size, eTransferDst | eIndexBuffer, eDeviceLocal);
+  copy_buffer(**staging_buffer, **index_buffer, buffer_size);
 }
 
 void RenderEngine::create_command_buffer() {
@@ -753,11 +782,10 @@ void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& command_buffer
   };
   command_buffer.setScissor(0, scissor);
 
-  vk::Buffer vertex_buffers[] = { **vertex_buffer };
-  vk::DeviceSize offsets[] = { 0 };
-  command_buffer.bindVertexBuffers(0, vertex_buffers, offsets);
+  command_buffer.bindVertexBuffers(0, { **vertex_buffer }, { 0 });
+  command_buffer.bindIndexBuffer(*index_buffer, 0, vk::IndexType::eUint16);
 
-  command_buffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+  command_buffer.drawIndexed(static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
 
   command_buffer.endRenderPass();
   command_buffer.end();

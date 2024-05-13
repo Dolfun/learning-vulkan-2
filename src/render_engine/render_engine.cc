@@ -47,7 +47,6 @@ RenderEngine::RenderEngine(const RenderConfig& _config, const Application& appli
 
 void RenderEngine::create_instance() {
   vk::ApplicationInfo application_info {
-    .sType = vk::StructureType::eApplicationInfo,
     .pApplicationName = "learning-vulkan-c++",
     .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
     .pEngineName = "null",
@@ -56,7 +55,6 @@ void RenderEngine::create_instance() {
   };
 
   vk::InstanceCreateInfo create_info {
-    .sType = vk::StructureType::eInstanceCreateInfo,
     .pApplicationInfo = &application_info,
   };
 
@@ -115,7 +113,6 @@ auto RenderEngine::get_debug_messenger_create_info() -> vk::DebugUtilsMessengerC
   using enum vk::DebugUtilsMessageSeverityFlagBitsEXT;
   using enum vk::DebugUtilsMessageTypeFlagBitsEXT;
   vk::DebugUtilsMessengerCreateInfoEXT create_info = {
-    .sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT,
     .messageSeverity = eWarning | eError,
     .messageType = eGeneral | eValidation | ePerformance,
     .pfnUserCallback = debug_callback,
@@ -249,7 +246,6 @@ void RenderEngine::create_logical_device() {
   for (auto queue_family : unique_queue_families) {
     float queue_priority = 1.0f;
     vk::DeviceQueueCreateInfo queue_create_info {
-      .sType = vk::StructureType::eDeviceQueueCreateInfo,
       .queueFamilyIndex = queue_family,
       .queueCount = 1,
       .pQueuePriorities = &queue_priority,
@@ -260,7 +256,6 @@ void RenderEngine::create_logical_device() {
   vk::PhysicalDeviceFeatures device_features {};
 
   vk::DeviceCreateInfo create_info {
-    .sType = vk::StructureType::eDeviceCreateInfo,
     .queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size()),
     .pQueueCreateInfos = queue_create_infos.data(),
     .enabledExtensionCount = static_cast<uint32_t>(required_device_extensions.size()),
@@ -351,7 +346,6 @@ void RenderEngine::create_swap_chain() {
   }
 
   vk::SwapchainCreateInfoKHR create_info = {
-    .sType = vk::StructureType::eSwapchainCreateInfoKHR,
     .surface = *surface,
     .minImageCount = image_count,
     .imageFormat = surface_format.format,
@@ -392,7 +386,6 @@ void RenderEngine::create_swap_chain_image_views() {
   swap_chain_image_views.reserve(size);
   for (size_t i = 0; i < size; ++i) {
     vk::ImageViewCreateInfo create_info {
-      .sType = vk::StructureType::eImageViewCreateInfo,
       .image = swap_chain_images[i],
       .viewType = vk::ImageViewType::e2D,
       .format = swap_chain_image_format,
@@ -448,7 +441,6 @@ void RenderEngine::create_render_pass() {
   };
 
   vk::RenderPassCreateInfo create_info {
-    .sType = vk::StructureType::eRenderPassCreateInfo,
     .attachmentCount = 1,
     .pAttachments = &color_attachment,
     .subpassCount = 1,
@@ -468,14 +460,12 @@ void RenderEngine::create_graphics_pipeline() {
   auto fragment_shader_module = create_shader_module(fragment_shader_code);
 
   vk::PipelineShaderStageCreateInfo vertex_shader_stage_create_info {
-    .sType = vk::StructureType::ePipelineShaderStageCreateInfo,
     .stage = vk::ShaderStageFlagBits::eVertex,
     .module = *vertex_shader_module,
     .pName = "main"
   };
 
   vk::PipelineShaderStageCreateInfo fragment_shader_stage_create_info {
-    .sType = vk::StructureType::ePipelineShaderStageCreateInfo,
     .stage = vk::ShaderStageFlagBits::eFragment,
     .module = *fragment_shader_module,
     .pName = "main"
@@ -508,7 +498,6 @@ void RenderEngine::create_graphics_pipeline() {
   };
 
   vk::PipelineVertexInputStateCreateInfo vertex_input_state_create_info {
-    .sType = vk::StructureType::ePipelineVertexInputStateCreateInfo,
     .vertexBindingDescriptionCount = 1,
     .pVertexBindingDescriptions = &binding_description,
     .vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descriptions.size()),
@@ -517,7 +506,6 @@ void RenderEngine::create_graphics_pipeline() {
 
   // Input Assembly
   vk::PipelineInputAssemblyStateCreateInfo input_assembly_state_create_info {
-    .sType = vk::StructureType::ePipelineInputAssemblyStateCreateInfo,
     .topology = vk::PrimitiveTopology::eTriangleList,
     .primitiveRestartEnable = false
   };
@@ -529,19 +517,16 @@ void RenderEngine::create_graphics_pipeline() {
   };
 
   vk::PipelineDynamicStateCreateInfo dynamic_state_create_info {
-    .sType = vk::StructureType::ePipelineDynamicStateCreateInfo,
     .dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
     .pDynamicStates = dynamic_states.data()
   };
 
   vk::PipelineViewportStateCreateInfo viewport_state_create_info {
-    .sType = vk::StructureType::ePipelineViewportStateCreateInfo,
     .viewportCount = 1,
     .scissorCount = 1
   };
 
   vk::PipelineRasterizationStateCreateInfo rasterization_state_create_info {
-    .sType = vk::StructureType::ePipelineRasterizationStateCreateInfo,
     .depthClampEnable = false,
     .rasterizerDiscardEnable = false,
     .polygonMode = vk::PolygonMode::eFill,
@@ -552,7 +537,6 @@ void RenderEngine::create_graphics_pipeline() {
   };
 
   vk::PipelineMultisampleStateCreateInfo multisample_state_create_info {
-    .sType = vk::StructureType::ePipelineMultisampleStateCreateInfo,
     .rasterizationSamples = vk::SampleCountFlagBits::e1,
     .sampleShadingEnable = false,
   };
@@ -564,18 +548,15 @@ void RenderEngine::create_graphics_pipeline() {
   };
 
   vk::PipelineColorBlendStateCreateInfo color_blend_state_create_info {
-    .sType = vk::StructureType::ePipelineColorBlendStateCreateInfo,
     .attachmentCount = 1,
     .pAttachments = &color_blend_attachment_state
   };
 
   vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
-    .sType = vk::StructureType::ePipelineLayoutCreateInfo
   };
   pipeline_layout = std::make_unique<vk::raii::PipelineLayout>(*device, pipeline_layout_create_info);
 
   vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info {
-    .sType = vk::StructureType::eGraphicsPipelineCreateInfo,
     .stageCount = static_cast<uint32_t>(shader_stages.size()),
     .pStages = shader_stages.data(),
     .pVertexInputState = &vertex_input_state_create_info,
@@ -611,7 +592,6 @@ std::vector<std::byte> RenderEngine::read_file(const std::string& path) {
 auto RenderEngine::create_shader_module(const std::vector<std::byte>& code) 
   -> std::unique_ptr<vk::raii::ShaderModule> {
   vk::ShaderModuleCreateInfo create_info {
-    .sType = vk::StructureType::eShaderModuleCreateInfo,
     .codeSize = code.size(),
     .pCode = reinterpret_cast<const uint32_t*>(code.data())
   };
@@ -627,7 +607,6 @@ void RenderEngine::create_framebuffers() {
     };
     
     vk::FramebufferCreateInfo create_info {
-      .sType = vk::StructureType::eFramebufferCreateInfo,
       .renderPass = *render_pass,
       .attachmentCount = static_cast<uint32_t>(attachments.size()),
       .pAttachments = attachments.data(),
@@ -642,7 +621,6 @@ void RenderEngine::create_framebuffers() {
 
 void RenderEngine::create_command_pool() {
   vk::CommandPoolCreateInfo create_info {
-    .sType = vk::StructureType::eCommandPoolCreateInfo,
     .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
     .queueFamilyIndex = queue_family_indices.graphics_family.value()
   };
@@ -664,7 +642,6 @@ auto RenderEngine::create_buffer(
   vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
     -> std::pair<std::unique_ptr<vk::raii::Buffer>, std::unique_ptr<vk::raii::DeviceMemory>> {
   vk::BufferCreateInfo create_info {
-    .sType = vk::StructureType::eBufferCreateInfo,
     .size = size,
     .usage = usage,
     .sharingMode = vk::SharingMode::eExclusive
@@ -673,7 +650,6 @@ auto RenderEngine::create_buffer(
   auto memory_requirements = buffer->getMemoryRequirements();
 
   vk::MemoryAllocateInfo allocate_info {
-    .sType = vk::StructureType::eMemoryAllocateInfo,
     .allocationSize = memory_requirements.size,
     .memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, properties)
   };
@@ -684,7 +660,6 @@ auto RenderEngine::create_buffer(
 
 void RenderEngine::copy_buffer(vk::Buffer src_buffer, vk::Buffer dst_buffer, vk::DeviceSize size) {
   vk::CommandBufferAllocateInfo command_buffer_allocate_info {
-    .sType = vk::StructureType::eCommandBufferAllocateInfo,
     .commandPool = *command_pool,
     .level = vk::CommandBufferLevel::ePrimary,
     .commandBufferCount = 1
@@ -694,7 +669,6 @@ void RenderEngine::copy_buffer(vk::Buffer src_buffer, vk::Buffer dst_buffer, vk:
   auto command_buffer = *transfer_command_buffers[0];
 
   vk::CommandBufferBeginInfo begin_info {
-    .sType = vk::StructureType::eCommandBufferBeginInfo,
     .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
   };
   command_buffer.begin(begin_info);
@@ -707,7 +681,6 @@ void RenderEngine::copy_buffer(vk::Buffer src_buffer, vk::Buffer dst_buffer, vk:
 
 
   vk::SubmitInfo submit_info {
-    .sType = vk::StructureType::eSubmitInfo,
     .commandBufferCount = 1,
     .pCommandBuffers = &command_buffer
   };
@@ -734,7 +707,6 @@ void RenderEngine::create_vertex_buffer() {
 
 void RenderEngine::create_command_buffer() {
   vk::CommandBufferAllocateInfo allocate_info {
-    .sType = vk::StructureType::eCommandBufferAllocateInfo,
     .commandPool = *command_pool,
     .level = vk::CommandBufferLevel::ePrimary,
     .commandBufferCount = config.max_frames_in_flight
@@ -747,14 +719,11 @@ void RenderEngine::create_command_buffer() {
 }
 
 void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& command_buffer, uint32_t image_index) {
-  vk::CommandBufferBeginInfo command_buffer_begin_info {
-    .sType = vk::StructureType::eCommandBufferBeginInfo,
-  };
+  vk::CommandBufferBeginInfo command_buffer_begin_info {};
   command_buffer.begin(command_buffer_begin_info);
 
   vk::ClearValue clear_color {{ std::array { 0.0f, 0.0f, 0.0f, 1.0f }}};
   vk::RenderPassBeginInfo render_pass_begin_info {
-    .sType = vk::StructureType::eRenderPassBeginInfo,
     .renderPass = *render_pass,
     .framebuffer = swap_chain_framebuffers[image_index],
     .renderArea = {
@@ -795,12 +764,9 @@ void RenderEngine::record_command_buffer(vk::raii::CommandBuffer& command_buffer
 }
 
 void RenderEngine::create_sync_objects() {
-  vk::SemaphoreCreateInfo semaphore_create_info {
-    .sType = vk::StructureType::eSemaphoreCreateInfo
-  };
+  vk::SemaphoreCreateInfo semaphore_create_info {};
 
   vk::FenceCreateInfo fence_create_info {
-    .sType = vk::StructureType::eFenceCreateInfo,
     .flags = vk::FenceCreateFlagBits::eSignaled
   };
 
@@ -829,7 +795,6 @@ void RenderEngine::render() {
   vk::Semaphore signal_semaphores[] = { *render_finished_semaphores[current_frame] };
   vk::CommandBuffer _command_buffers[] = { command_buffers[current_frame] };
   vk::SubmitInfo submit_info {
-    .sType = vk::StructureType::eSubmitInfo,
     .waitSemaphoreCount = 1,
     .pWaitSemaphores = wait_semaphores,
     .pWaitDstStageMask = wait_stages,
@@ -842,7 +807,6 @@ void RenderEngine::render() {
 
   vk::SwapchainKHR swap_chains[] = { **swap_chain };
   vk::PresentInfoKHR present_info {
-    .sType = vk::StructureType::ePresentInfoKHR,
     .waitSemaphoreCount = 1,
     .pWaitSemaphores = signal_semaphores,
     .swapchainCount = 1,

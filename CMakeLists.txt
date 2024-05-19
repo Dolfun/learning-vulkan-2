@@ -3,7 +3,7 @@ project(learning-vulkan-2)
 
 find_package(fmt REQUIRED)
 find_package(glm REQUIRED)
-find_package(glfw3 REQUIRED)
 find_package(Vulkan REQUIRED)
 
+add_subdirectory(extern)
 add_subdirectory(src)

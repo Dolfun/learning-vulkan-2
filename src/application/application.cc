@@ -1,4 +1,6 @@
 #include "Application.h"
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 #include <fmt/core.h>
 #include <stdexcept>
 #include <algorithm>
@@ -41,7 +43,8 @@ void Application::init_render_engine() {
       .height = static_cast<uint32_t>(framebuffer_height)
     },
     .vulkan = {
-      .requested_layers = { "VK_LAYER_KHRONOS_validation" }
+      .required_extensions = {},
+      .requested_layers = { "VK_LAYER_KHRONOS_validation" },
     },
     .max_frames_in_flight = 2
   };

@@ -1,4 +1,4 @@
-#include "Application.h"
+#include "application.h"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <fmt/core.h>
